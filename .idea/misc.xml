@@ -3,4 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="uv (MARL Incentives)" />
   </component>
+  <component name="ProjectRootManager" version="2" project-jdk-name="uv (MARL_incentives)" project-jdk-type="Python SDK" />
 </project>
