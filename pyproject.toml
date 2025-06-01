@@ -1,0 +1,16 @@
+[project]
+name = "marl-incentives"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Germán Pardo-González", email = "germanrpardo1@outlook.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "numpy>=2.2.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
