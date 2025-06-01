@@ -28,7 +28,6 @@ from sumolib.net import readNet  # noqa
 
 
 class EdgeMemory:
-
     def __init__(self, cost):
         self.cost = cost
         self.seen = True
@@ -45,7 +44,7 @@ class CostMemory(handler.ContentHandler):
 
     def __init__(self, cost_attribute, pessimism=0, network_file=None):
         # the cost attribute to parse (i.e. 'traveltime')
-        self.cost_attribute = cost_attribute.encode('utf8')
+        self.cost_attribute = cost_attribute.encode("utf8")
         # the duaIterate iteration index
         self.iteration = None
         # the main data store: for every interval and edge id we store costs and
@@ -74,24 +73,29 @@ class CostMemory(handler.ContentHandler):
         if network_file is not None:
             # build a map of default weights for decaying edges assuming the
             # attribute is traveltime
-            self.traveltime_free = dict([(e.getID(), e.getLength() / e.getSpeed())
-                                         for e in readNet(network_file).getEdges()])
+            self.traveltime_free = dict(
+                [
+                    (e.getID(), e.getLength() / e.getSpeed())
+                    for e in readNet(network_file).getEdges()
+                ]
+            )
         self.pessimism = pessimism
 
     def startElement(self, name, attrs):
-        if name == 'interval':
-            self.current_interval = self.intervals[float(attrs['begin'])]
-        if name == 'edge':
-            id = attrs['id']
+        if name == "interval":
+            self.current_interval = self.intervals[float(attrs["begin"])]
+        if name == "edge":
+            id = attrs["id"]
             # may be missing for some
-            if self.cost_attribute.decode('utf-8') in attrs:
+            if self.cost_attribute.decode("utf-8") in attrs:
                 self.num_loaded += 1
-                cost = float(attrs[self.cost_attribute.decode('utf-8')])
+                cost = float(attrs[self.cost_attribute.decode("utf-8")])
                 if id in self.current_interval:
                     edgeMemory = self.current_interval[id]
                     self.errors.append(edgeMemory.cost - cost)
                     edgeMemory.update(
-                        cost, self.memory_weight, self.new_weight, self.pessimism)
+                        cost, self.memory_weight, self.new_weight, self.pessimism
+                    )
                     # if id == "4.3to4.4":
                     #    with open('debuglog', 'a') as f:
                     #        print(self.memory_factor, edgeMemory.cost, file=f)
@@ -104,7 +108,9 @@ class CostMemory(handler.ContentHandler):
         # iteration
         if weight <= 0:
             sys.stderr.write(
-                "Skipped loading of costs because the weight was %s but should have been > 0\n" % weight)
+                "Skipped loading of costs because the weight was %s but should have been > 0\n"
+                % weight
+            )
             return
         assert weight > 0
         if self.iteration is None and iteration != 0:
@@ -128,7 +134,11 @@ class CostMemory(handler.ContentHandler):
             for id, edgeMemory in edges.items():
                 if not edgeMemory.seen:
                     edgeMemory.update(
-                        self.traveltime_free[id], self.memory_weight, self.new_weight, self.pessimism)
+                        self.traveltime_free[id],
+                        self.memory_weight,
+                        self.new_weight,
+                        self.pessimism,
+                    )
                     self.num_decayed += 1
                     # if id == "4.3to4.4":
                     #    with open('debuglog', 'a') as f:
@@ -136,28 +146,31 @@ class CostMemory(handler.ContentHandler):
         # figure out the interval length
         if len(self.intervals.keys()) > 1:
             sorted_begin_times = sorted(self.intervals.keys())
-            self.interval_length = sorted_begin_times[
-                1] - sorted_begin_times[0]
+            self.interval_length = sorted_begin_times[1] - sorted_begin_times[0]
         self.memory_weight += self.new_weight
 
     def write_costs(self, weight_file):
-        with open(weight_file, 'w') as f:
-            f.write('<netstats>\n')
+        with open(weight_file, "w") as f:
+            f.write("<netstats>\n")
             for start, edge_costs in self.intervals.items():
-                f.write('    <interval begin="%d" end="%d">\n' %
-                        (start, start + self.interval_length))
+                f.write(
+                    '    <interval begin="%d" end="%d">\n'
+                    % (start, start + self.interval_length)
+                )
                 for id, edgeMemory in edge_costs.items():
-                    f.write('        <edge id="%s" %s="%s"/>\n' %
-                            (id, self.cost_attribute.decode('utf-8'), edgeMemory.cost))
-                f.write('    </interval>\n')
-            f.write('</netstats>\n')
+                    f.write(
+                        '        <edge id="%s" %s="%s"/>\n'
+                        % (id, self.cost_attribute.decode("utf-8"), edgeMemory.cost)
+                    )
+                f.write("    </interval>\n")
+            f.write("</netstats>\n")
 
     def avg_error(self, values=None):
         if not values:
             values = self.errors
         length = len(list(values))
         if length > 0:
-            return (sum(list(values)) / length)
+            return sum(list(values)) / length
         return 0
 
     def avg_abs_error(self):
