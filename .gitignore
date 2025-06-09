@@ -1,0 +1,10 @@
+*.pkl
+*.xml
+*.pdf
+*.png
+*.txt
+*.html
+*.rou
+*.alt
+*data
+*.idea
