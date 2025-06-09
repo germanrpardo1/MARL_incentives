@@ -6,4 +6,5 @@
 *.html
 *.rou
 *.alt
-*data
+.data
+.idea
