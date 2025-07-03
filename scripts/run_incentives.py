@@ -11,7 +11,7 @@ import copy
 import yaml
 from co2Emissions.xmlreader import co2_main
 import pickle
-
+import pandas
 
 def eps_greedy_policy(q, actions, trip, original_costs, incentives, epsilon=0.1):
     costs = copy.deepcopy(original_costs)
@@ -387,7 +387,7 @@ def main():
     decay = config["decay"]
     alpha = config["alpha"]
 
-    B = config["B"]
+    total_budget = config["B"]
     budget = config["budget"]
 
     actions, trips, costs = get_actions()
@@ -395,15 +395,15 @@ def main():
     ttts = []
     emissions_total = []
     q = initialise(trips, actions, incentives)
-
+    # TODO(German): Add all paths to config
     results_folder_time = (
-        f"results/time/MARL_time_budget_{B}"
+        f"results/time/MARL_time_budget_{total_budget}"
         f"_time_weight_{individual_travel_time_weight}"
         f"_emission_weight_{emissions_weight}"
         f"_{budget}.pkl"
     )
     results_folder_emissions = (
-        f"results/emissions/MARL_emissions_budget_{B}"
+        f"results/emissions/MARL_emissions_budget_{total_budget}"
         f"_time_weight_{individual_travel_time_weight}"
         f"_emission_weight_{emissions_weight}"
         f"_{budget}.pkl"
@@ -411,7 +411,7 @@ def main():
 
     for ep in range(episodes):
         a, _, action_index = policy(
-            trips, q, actions, costs, incentives, epsilon, B=B, budget=budget
+            trips, q, actions, costs, incentives, epsilon, B=total_budget, budget=budget
         )
 
         # Run a simulation to evaluate the actions selected
