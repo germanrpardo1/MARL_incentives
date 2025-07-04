@@ -23,7 +23,7 @@ decay: 0.996
 # Learning rate (α) for Q-learning or other value update algorithms
 alpha: 0.1
 # Available budget for incentives or policies (can be used as a constraint)
-B: 1e12
+B: 100
 # Whether to enforce budget constraints during training
 budget: true
 

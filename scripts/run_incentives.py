@@ -11,7 +11,7 @@ import copy
 import yaml
 from co2Emissions.xmlreader import co2_main
 import pickle
-import pandas
+
 
 def eps_greedy_policy(q, actions, trip, original_costs, incentives, epsilon=0.1):
     costs = copy.deepcopy(original_costs)
@@ -36,16 +36,16 @@ def eps_greedy_policy(q, actions, trip, original_costs, incentives, epsilon=0.1)
 
 def step(actions):
     write_routes(actions)
-    write_edge_data_config("edge_data.add.xml", 500, "weights.xml")
+    write_edge_data_config("data/edge_data.add.xml", 500, "data/edge_data.add.xml")
     write_sumo_config(
-        "config.sumocfg",
-        "kamppi.net.xml",
-        "output.rou.xml",
-        "weights.xml",
-        "edge_data.add.xml",
+        "data/config.sumocfg",
+        "data/kamppi.net.xml",
+        "data/output.rou.xml",
+        "data/weights.xml",
+        "data/edge_data.add.xml",
     )
     run_simulation()
-    tot_emission = co2_main("fcd.xml")
+    tot_emission = co2_main("data/fcd.xml")
 
     return (
         (get_TTT() / (60**2)),
@@ -55,7 +55,7 @@ def step(actions):
     )
 
 
-def get_actions(file="output.rou.alt.xml"):
+def get_actions(file="data/output.rou.alt.xml"):
     tree = ET.parse(file)
     root = tree.getroot()
 
@@ -85,13 +85,13 @@ def get_actions(file="output.rou.alt.xml"):
 
 
 def run_simulation():
-    sys.stdout = sumolib.TeeFile(sys.stdout, open("log.xml", "w+"))
-    log = open("log.xml", "w+")
+    sys.stdout = sumolib.TeeFile(sys.stdout, open("data/log.xml", "w+"))
+    log = open("data/log.xml", "w+")
 
     log.flush()
     sys.stdout.flush()
 
-    sumo_cmd = ["sumo", "-c", "config.sumocfg"]
+    sumo_cmd = ["sumo", "-c", "data/config.sumocfg"]
 
     sumo_cmd = list(map(str, sumo_cmd))
     subprocess.call(sumo_cmd, stdout=log, stderr=log)
@@ -111,12 +111,12 @@ def write_sumo_config(filename, net_file, route_files, weight_file, additional_f
         "--edgedata-output",
         weight_file,
         "--tripinfo-output",
-        "tripinfo.xml",
+        "data/tripinfo.xml",
         "--log",
-        "log.xml",
+        "data/log.xml",
         "--no-step-log",
         "--additional-files",
-        additional_files,  #'edge_data.add.xml',
+        additional_files,
         "--begin",
         "0",
         "--route-steps",
@@ -134,9 +134,9 @@ def write_sumo_config(filename, net_file, route_files, weight_file, additional_f
         "--no-warnings",
         "True",
         "--statistic-output",
-        "stats.xml",
+        "data/stats.xml",
         "--fcd-output",
-        "fcd.xml",
+        "data/fcd.xml",
         "--fcd-output.acceleration",
     ]
     subprocess.call(sumo_cmd, stdout=subprocess.PIPE)
@@ -173,7 +173,7 @@ def write_edge_data_config(filename, freq, file):
         file.write(pretty_xml_str)
 
 
-def write_routes(vehicle_routes, file="output.rou.xml"):
+def write_routes(vehicle_routes, file="data/output.rou.xml"):
     # Create the root element
     routes_element = ET.Element("routes")
     routes_element.set("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance")
@@ -215,7 +215,7 @@ def write_routes(vehicle_routes, file="output.rou.xml"):
         f.write(pretty_xml_str)
 
 
-def get_TTT(file="stats.xml"):
+def get_TTT(file="data/stats.xml"):
     tree = ET.parse(file)
     root = tree.getroot()
 
@@ -224,7 +224,7 @@ def get_TTT(file="stats.xml"):
     return total_travel_time
 
 
-def travelTimes(file="tripinfo.xml"):
+def travelTimes(file="data/tripinfo.xml"):
     # Parse the XML data
     tree = ET.parse(file)
     root = tree.getroot()
@@ -290,7 +290,7 @@ def calculate_route_cost(actions, weights):
     return costs_r
 
 
-def emissions_func(file_path="emissions_per_vehicle.txt"):
+def emissions_func(file_path="data/emissions_per_vehicle.txt"):
     vehicle_emission = {}
 
     # Read the TXT file
@@ -372,7 +372,7 @@ window_size = 20  # Choose a window size
 
 
 def main():
-    with open("config.yaml", "r") as file:
+    with open("scripts/config.yaml", "r") as file:
         config = yaml.safe_load(file)
     episodes = config["episodes"]
 
@@ -447,7 +447,7 @@ def main():
             print("Emissions:", np.mean(emissions_total[(ep - 50) : (ep + 1)]))
 
         # Retrieve updated route costs
-        costs = calculate_route_cost(actions, parse_weights("weights.xml"))
+        costs = calculate_route_cost(actions, parse_weights("data/weights.xml"))
 
 
 if __name__ == "__main__":
