@@ -1,6 +1,7 @@
 """This script runs the incentives MARL algorithm."""
 
 import sys
+from pathlib import Path
 
 import numpy as np
 import xml.etree.ElementTree as ET
@@ -36,13 +37,17 @@ def eps_greedy_policy(q, actions, trip, original_costs, incentives, epsilon=0.1)
 
 def step(actions):
     write_routes(actions)
-    write_edge_data_config("data/edge_data.add.xml", 500, "data/edge_data.add.xml")
+    write_edge_data_config(
+        filename="data/edge_data.add.xml",
+        freq=500,
+        file="edge_data.add.xml"
+    )
     write_sumo_config(
-        "data/config.sumocfg",
-        "data/kamppi.net.xml",
-        "data/output.rou.xml",
-        "data/weights.xml",
-        "data/edge_data.add.xml",
+        filename="data/config.sumocfg",
+        net_file="data/kamppi.net.xml",
+        route_files="data/output.rou.xml",
+        weight_file="data/weights.xml",
+        additional_files="edge_data.add.xml",
     )
     run_simulation()
     tot_emission = co2_main("data/fcd.xml")
@@ -96,49 +101,31 @@ def run_simulation():
     sumo_cmd = list(map(str, sumo_cmd))
     subprocess.call(sumo_cmd, stdout=log, stderr=log)
 
-    # self.TTTs.append(self.parse_tripinfo('tripinfo.xml'))
-
 
 def write_sumo_config(filename, net_file, route_files, weight_file, additional_files):
     sumo_cmd = [
         "sumo",
-        "-n",
-        net_file,
-        "-r",
-        route_files,
-        "--save-configuration",
-        filename,
-        "--edgedata-output",
-        weight_file,
-        "--tripinfo-output",
-        "data/tripinfo.xml",
-        "--log",
-        "data/log.xml",
+        "-n", net_file,
+        "-r", route_files,
+        "--save-configuration", filename,
+        "--edgedata-output", str(weight_file),
+        "--tripinfo-output", str(Path("data") / "tripinfo.xml"),
+        "--log", str(Path("data") / "log.xml"),
         "--no-step-log",
-        "--additional-files",
-        additional_files,
-        "--begin",
-        "0",
-        "--route-steps",
-        "200",
-        "--time-to-teleport",
-        "300",
-        "--time-to-teleport.highways",
-        "0",
-        "--no-internal-links",
-        "False",
-        "--eager-insert",
-        "False",
-        "--verbose",
-        "True",
-        "--no-warnings",
-        "True",
-        "--statistic-output",
-        "data/stats.xml",
-        "--fcd-output",
-        "data/fcd.xml",
+        "--additional-files", additional_files,
+        "--begin", "0",
+        "--route-steps", "200",
+        "--time-to-teleport", "300",
+        "--time-to-teleport.highways", "0",
+        "--no-internal-links", "False",
+        "--eager-insert", "False",
+        "--verbose", "True",
+        "--no-warnings", "True",
+        "--statistic-output", str(Path("data") / "stats.xml"),
+        "--fcd-output", str(Path("data") / "fcd.xml"),
         "--fcd-output.acceleration",
     ]
+
     subprocess.call(sumo_cmd, stdout=subprocess.PIPE)
 
 
@@ -147,7 +134,7 @@ def write_edge_data_config(filename, freq, file):
     root = ET.Element("a")
 
     # edgeData element
-    edge_data_elem = ET.SubElement(
+    ET.SubElement(
         root,
         "edgeData",
         {
@@ -160,7 +147,7 @@ def write_edge_data_config(filename, freq, file):
     )
 
     # Create the XML tree
-    tree = ET.ElementTree(root)
+    ET.ElementTree(root)
 
     # Convert to string
     xml_str = ET.tostring(root, encoding="unicode")
@@ -436,15 +423,15 @@ def main():
 
         epsilon = max(0.01, epsilon * decay)
 
-        if (ep + 1) % (episodes // 2) == 0:
-            with open(results_folder_time, "wb") as fp:  # Pickling
-                pickle.dump(ttts, fp)
-
-            with open(results_folder_emissions, "wb") as fp:  # Pickling
-                pickle.dump(emissions_total, fp)
-            print(ep)
-            print("TTT:", np.mean(ttts[(ep - 50) : (ep + 1)]))
-            print("Emissions:", np.mean(emissions_total[(ep - 50) : (ep + 1)]))
+        # if (ep + 1) % (episodes // 2) == 0:
+        #     with open(results_folder_time, "wb") as fp:  # Pickling
+        #         pickle.dump(ttts, fp)
+        #
+        #     with open(results_folder_emissions, "wb") as fp:  # Pickling
+        #         pickle.dump(emissions_total, fp)
+        #     print(ep)
+        #     print("TTT:", np.mean(ttts[(ep - 50) : (ep + 1)]))
+        #     print("Emissions:", np.mean(emissions_total[(ep - 50) : (ep + 1)]))
 
         # Retrieve updated route costs
         costs = calculate_route_cost(actions, parse_weights("data/weights.xml"))
