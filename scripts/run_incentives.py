@@ -38,9 +38,7 @@ def eps_greedy_policy(q, actions, trip, original_costs, incentives, epsilon=0.1)
 def step(actions):
     write_routes(actions)
     write_edge_data_config(
-        filename="data/edge_data.add.xml",
-        freq=500,
-        file="edge_data.add.xml"
+        filename="data/edge_data.add.xml", freq=500, file="edge_data.add.xml"
     )
     write_sumo_config(
         filename="data/config.sumocfg",
@@ -60,33 +58,42 @@ def step(actions):
     )
 
 
-def get_actions(file="data/output.rou.alt.xml"):
-    tree = ET.parse(file)
+def get_actions(file_path: str) -> dict:
+    """
+    Parse an XML file and extract available vehicle routes and their costs.
+
+    :param file_path: Path to the XML file.
+    :return:
+        - A dictionary mapping vehicle IDs to lists of (index, edge list) tuples
+            and costs
+    """
+    tree = ET.parse(file_path)
     root = tree.getroot()
 
-    # Initialize the dictionary to store the data
-    vehicle_routes = {}
-    W = []
-    route_costs = {}
+    vehicle_routes_and_costs = {}  # vehicle_id -> [(index, edges), costs]
+    vehicle_ids = []  # List of vehicle IDs
 
-    # Iterate over each vehicle element
+    # Loop through all the vehicles
     for vehicle in root.findall("vehicle"):
+        # Get vehicle ID
         vehicle_id = vehicle.get("id")
-        W.append(vehicle_id)
-        routes = []
-        route_cost = []
-        # Find routeDistribution within the vehicle
-        route_distribution = vehicle.find("routeDistribution")
-        if route_distribution:
-            # Iterate over each route element within the routeDistribution
-            for i, route in enumerate(route_distribution.findall("route")):
-                edges = route.get("edges").split()
-                routes.append((i, edges))
-                route_cost.append(float(route.get("cost")))
+        vehicle_ids.append(vehicle_id)
 
-        vehicle_routes[vehicle_id] = routes
-        route_costs[vehicle_id] = route_cost
-    return vehicle_routes, W, route_costs
+        routes = []
+        costs = []
+
+        route_distribution = vehicle.find("routeDistribution")
+        if route_distribution is not None:
+            # Loop through all routes for the given vehicle
+            for i, route in enumerate(route_distribution.findall("route")):
+                edge_list = route.get("edges", "").split()
+                cost = float(route.get("cost", "0"))
+                routes.append((i, edge_list))
+                costs.append(cost)
+
+        vehicle_routes_and_costs[vehicle_id] = (routes, costs)
+
+    return vehicle_routes_and_costs
 
 
 def run_simulation():
@@ -105,24 +112,41 @@ def run_simulation():
 def write_sumo_config(filename, net_file, route_files, weight_file, additional_files):
     sumo_cmd = [
         "sumo",
-        "-n", net_file,
-        "-r", route_files,
-        "--save-configuration", filename,
-        "--edgedata-output", str(weight_file),
-        "--tripinfo-output", str(Path("data") / "tripinfo.xml"),
-        "--log", str(Path("data") / "log.xml"),
+        "-n",
+        net_file,
+        "-r",
+        route_files,
+        "--save-configuration",
+        filename,
+        "--edgedata-output",
+        str(weight_file),
+        "--tripinfo-output",
+        str(Path("data") / "tripinfo.xml"),
+        "--log",
+        str(Path("data") / "log.xml"),
         "--no-step-log",
-        "--additional-files", additional_files,
-        "--begin", "0",
-        "--route-steps", "200",
-        "--time-to-teleport", "300",
-        "--time-to-teleport.highways", "0",
-        "--no-internal-links", "False",
-        "--eager-insert", "False",
-        "--verbose", "True",
-        "--no-warnings", "True",
-        "--statistic-output", str(Path("data") / "stats.xml"),
-        "--fcd-output", str(Path("data") / "fcd.xml"),
+        "--additional-files",
+        additional_files,
+        "--begin",
+        "0",
+        "--route-steps",
+        "200",
+        "--time-to-teleport",
+        "300",
+        "--time-to-teleport.highways",
+        "0",
+        "--no-internal-links",
+        "False",
+        "--eager-insert",
+        "False",
+        "--verbose",
+        "True",
+        "--no-warnings",
+        "True",
+        "--statistic-output",
+        str(Path("data") / "stats.xml"),
+        "--fcd-output",
+        str(Path("data") / "fcd.xml"),
         "--fcd-output.acceleration",
     ]
 
@@ -306,11 +330,20 @@ def emissions_func(file_path="data/emissions_per_vehicle.txt"):
     return vehicle_emission
 
 
-def initialise(trips, actions, Incentives):
-    q = {}
-    for trip in trips:
-        q[trip] = np.zeros((len(actions[trip]), len(Incentives)))
-    return q
+def initialise_q_function(actions_costs: dict, incentives_n: int) -> dict:
+    """
+    Initialise the Q-function.
+
+    :param actions_costs: dictionary that stores the possible routes for each
+        trip and their cost
+    :param incentives_n: number of incentives options
+    :return: initialised Q-function for every trip.
+    """
+
+    return {
+        trip: np.zeros((len(action_cost[0]), incentives_n))
+        for trip, action_cost in actions_costs.items()
+    }
 
 
 def policy(trips, q, actions, costs, Incentives, epsilon, B=10e10, budget=False):
@@ -361,6 +394,7 @@ window_size = 20  # Choose a window size
 def main():
     with open("scripts/config.yaml", "r") as file:
         config = yaml.safe_load(file)
+
     episodes = config["episodes"]
 
     ttt_weight = config["TTT_weight"]
@@ -368,7 +402,7 @@ def main():
     emissions_weight = config["emissions_weight"]
     total_emissions_weight = config["total_emissions_weight"]
 
-    incentives = config["incentives"]
+    n_incentives = config["n_incentives"]
 
     epsilon = config["epsilon"]
     decay = config["decay"]
@@ -377,28 +411,31 @@ def main():
     total_budget = config["B"]
     budget = config["budget"]
 
-    actions, trips, costs = get_actions()
+    # Path for output_rou_alt
+    output_rou_alt_path = config["output_rou_alt_path"]
 
+    actions_and_costs = get_actions(file_path=output_rou_alt_path)
+
+    # Unpack all the trip IDs
+    trips_id = list(actions_and_costs.keys())
+
+    # actions_costs
     ttts = []
     emissions_total = []
-    q = initialise(trips, actions, incentives)
-    # TODO(German): Add all paths to config
-    results_folder_time = (
-        f"results/time/MARL_time_budget_{total_budget}"
-        f"_time_weight_{individual_travel_time_weight}"
-        f"_emission_weight_{emissions_weight}"
-        f"_{budget}.pkl"
-    )
-    results_folder_emissions = (
-        f"results/emissions/MARL_emissions_budget_{total_budget}"
-        f"_time_weight_{individual_travel_time_weight}"
-        f"_emission_weight_{emissions_weight}"
-        f"_{budget}.pkl"
-    )
+
+    # Initialise the Q-function
+    q = initialise_q_function(actions_and_costs, incentives_n=n_incentives)
 
     for ep in range(episodes):
         a, _, action_index = policy(
-            trips, q, actions, costs, incentives, epsilon, B=total_budget, budget=budget
+            trips_id,
+            q,
+            actions,
+            costs,
+            incentives,
+            epsilon,
+            B=total_budget,
+            budget=budget,
         )
 
         # Run a simulation to evaluate the actions selected
@@ -409,7 +446,7 @@ def main():
 
         # For each agent update Q function
         # Q(a) = Q(a) + alpha * (r - Q(a))
-        for trip in trips:
+        for trip in trips_id:
             r = -(
                 individual_travel_time_weight * ind_travel_times[trip]
                 + ttt_weight * ttt
@@ -422,16 +459,6 @@ def main():
             ] + alpha * r
 
         epsilon = max(0.01, epsilon * decay)
-
-        # if (ep + 1) % (episodes // 2) == 0:
-        #     with open(results_folder_time, "wb") as fp:  # Pickling
-        #         pickle.dump(ttts, fp)
-        #
-        #     with open(results_folder_emissions, "wb") as fp:  # Pickling
-        #         pickle.dump(emissions_total, fp)
-        #     print(ep)
-        #     print("TTT:", np.mean(ttts[(ep - 50) : (ep + 1)]))
-        #     print("Emissions:", np.mean(emissions_total[(ep - 50) : (ep + 1)]))
 
         # Retrieve updated route costs
         costs = calculate_route_cost(actions, parse_weights("data/weights.xml"))

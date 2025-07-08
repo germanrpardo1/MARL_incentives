@@ -84,4 +84,3 @@ def co2_main(path):
             file.write(f"{vehicle};{emission}\n")
 
     return total_emissions
-

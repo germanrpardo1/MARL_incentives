@@ -1,5 +1,10 @@
+# Path of output.rou.alt file
+output_rou_alt_path: "data/output.rou.alt.xml"
+
+
+
 # Number of training episodes for the RL agent
-episodes: 1
+episodes: 2
 
 ### Weights for different components of the reward/cost function
 # Weight for Total Travel Time (TTT) of the network
@@ -11,10 +16,8 @@ emissions_weight: 0.5
 # Total emissions weight
 total_emissions_weight: 0
 
-# Incentive values for actions (e.g., tolling or routing strategies)
-incentives:
-  - 0     # No incentive
-  - 0.8   # Partial incentive
+# Number of incentives options
+n_incentives: 2
 
 # Exploration rate for epsilon-greedy policy
 epsilon: 0.9
