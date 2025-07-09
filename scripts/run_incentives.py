@@ -14,29 +14,47 @@ from co2Emissions.xmlreader import co2_main
 import pickle
 
 
-def eps_greedy_policy(q, actions, trip, original_costs, incentives, epsilon=0.1):
-    costs = copy.deepcopy(original_costs)
-    if np.random.binomial(1, epsilon) == 1:
+# TODO(German): Handle for when budget=False (or check it's handled)
+def eps_greedy_policy(q, trip_id, actions_costs, n_incentives, epsilon=0.1):
+    """
+    Epsilon greedy policy.
+
+    :param q: Q-function
+    :param trip_id: Trip id for which action is selected
+    :param actions_costs: Routes and costs for each trip
+    :param n_incentives: Number of incentives to select
+    :param epsilon: Epsilon value for random action selection
+    :return: Route edges, action selected, action index and incentive value.
+    """
+    if np.random.uniform() <= epsilon:
+        # Select random route and whether to incentivise or not
         action_index = (
-            np.random.randint(len(costs[trip])),
-            np.random.randint(len(incentives)),
+            np.random.randint(len(actions_costs[trip_id][1])),
+            np.random.randint(n_incentives),
         )
     else:
-        action_index = np.unravel_index(np.argmax(q[trip]), np.shape(q[trip]))
+        # Select action with highest Q-value
+        action_index = np.unravel_index(np.argmax(q[trip_id]), np.shape(q[trip_id]))
 
-    if incentives[action_index[1]] > 0:
-        incentive = costs[trip][action_index[0]] - min(costs[trip]) + 1
+    if action_index[1] > 0:
+        incentive = (
+            actions_costs[trip_id][1][action_index[0]]
+            - min(actions_costs[trip_id][1])
+            + 1
+        )
     else:
         incentive = 0
-    costs[trip][action_index[0]] -= incentive
 
-    action = np.argmin(costs[trip])
-    a = actions[trip][action][1]
-    return a, action, action_index, incentive
+    # Subtract incentive from original cost for selected route
+    actions_costs[trip_id][1][action_index[0]] -= incentive
+    # Select route after incentives
+    action = np.argmin(actions_costs[trip_id][1])
+    route_edges = actions_costs[trip_id][0][action][1]
+    return route_edges, action, action_index, incentive
 
 
-def step(actions):
-    write_routes(actions)
+def step(routes_edges):
+    write_routes(routes_edges)
     write_edge_data_config(
         filename="data/edge_data.add.xml", freq=500, file="edge_data.add.xml"
     )
@@ -346,24 +364,44 @@ def initialise_q_function(actions_costs: dict, incentives_n: int) -> dict:
     }
 
 
-def policy(trips, q, actions, costs, Incentives, epsilon, B=10e10, budget=False):
-    a = {}
+def policy(
+    trips_id: list,
+    q: dict,
+    actions_costs: dict,
+    n_incentives: int,
+    epsilon: float,
+    total_budget: float,
+    *,
+    budget: bool,
+) -> tuple[dict, dict]:
+    """
+    Policy function for the RL algorithm.
+
+    :param trips_id: list of trip IDs
+    :param q: Q-function
+    :param actions_costs: dictionary that stores the possible routes and costs
+    :param n_incentives: number of incentives options
+    :total_budget: total budget
+    :param budget: True if using incentives, False otherwise
+    :return: Routes' edges and actions' indexes
+    """
+    route_edges = {}
     action = {}
     action_index = {}
     b = 0
-    for trip in trips:
-        a[trip], action[trip], action_index[trip], incentive = eps_greedy_policy(
-            q, actions, trip, costs, Incentives, epsilon=epsilon
+    for trip in trips_id:
+        route_edges[trip], action[trip], action_index[trip], incentive = (
+            eps_greedy_policy(q, trip, actions_costs, n_incentives, epsilon=epsilon)
         )
         if budget:
-            if (b + incentive) <= B:
+            if (b + incentive) <= total_budget:
                 b += incentive
             else:
                 action_index[trip] = (action_index[trip][0], 0)
-                action[trip] = np.argmin(costs[trip])
-                a[trip] = actions[trip][action[trip]][1]
+                action[trip] = np.argmin(actions_costs[trip][1])
+                route_edges[trip] = actions_costs[trip][0][action[trip]][1]
 
-    return a, action, action_index
+    return route_edges, action_index
 
 
 def prob_calc(costs, theta=-0.01):
@@ -395,8 +433,10 @@ def main():
     with open("scripts/config.yaml", "r") as file:
         config = yaml.safe_load(file)
 
+    # Number of episodes for the RL algorithm
     episodes = config["episodes"]
 
+    # Setting weights of the objective function
     ttt_weight = config["TTT_weight"]
     individual_travel_time_weight = config["individual_travel_time_weight"]
     emissions_weight = config["emissions_weight"]
@@ -404,42 +444,46 @@ def main():
 
     n_incentives = config["n_incentives"]
 
+    # RL hyper-parameters
     epsilon = config["epsilon"]
     decay = config["decay"]
     alpha = config["alpha"]
 
+    # Setting parameters for budget
     total_budget = config["B"]
     budget = config["budget"]
 
     # Path for output_rou_alt
     output_rou_alt_path = config["output_rou_alt_path"]
 
+    # Getting available actions based on pre-computed routes
     actions_and_costs = get_actions(file_path=output_rou_alt_path)
 
-    # Unpack all the trip IDs
+    # Unpack all the trip IDs for future use
     trips_id = list(actions_and_costs.keys())
 
-    # actions_costs
     ttts = []
     emissions_total = []
 
     # Initialise the Q-function
-    q = initialise_q_function(actions_and_costs, incentives_n=n_incentives)
-
+    q = initialise_q_function(
+        actions_costs=actions_and_costs, incentives_n=n_incentives
+    )
+    ## vehicle_id -> [(index, edges), costs]
+    # Start training the agent
     for ep in range(episodes):
-        a, _, action_index = policy(
-            trips_id,
-            q,
-            actions,
-            costs,
-            incentives,
-            epsilon,
-            B=total_budget,
+        routes_edges, action_index = policy(
+            trips_id=trips_id,
+            q=q,
+            actions_costs=actions_and_costs,
+            n_incentives=n_incentives,
+            epsilon=epsilon,
+            total_budget=total_budget,
             budget=budget,
         )
 
         # Run a simulation to evaluate the actions selected
-        ttt, ind_travel_times, emissions, tot_emission = step(a)
+        ttt, ind_travel_times, emissions, tot_emission = step(routes_edges=routes_edges)
 
         ttts.append(ttt)
         emissions_total.append(tot_emission * 30 + 300)
@@ -461,7 +505,8 @@ def main():
         epsilon = max(0.01, epsilon * decay)
 
         # Retrieve updated route costs
-        costs = calculate_route_cost(actions, parse_weights("data/weights.xml"))
+        # TODO(German): fix line below
+        # costs = calculate_route_cost(actions, parse_weights("data/weights.xml"))
 
 
 if __name__ == "__main__":
