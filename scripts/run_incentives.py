@@ -15,42 +15,48 @@ import pickle
 
 
 # TODO(German): Handle for when budget=False (or check it's handled)
-def eps_greedy_policy(q, trip_id, actions_costs, n_incentives, epsilon=0.1):
+def eps_greedy_policy(
+    q: dict, trip_id: str, actions_costs: dict, n_incentives: int, epsilon: float = 0.1
+) -> tuple[dict, dict, dict, float]:
     """
-    Epsilon greedy policy.
+    Epsilon-greedy policy for selecting an action.
 
-    :param q: Q-function
-    :param trip_id: Trip id for which action is selected
-    :param actions_costs: Routes and costs for each trip
-    :param n_incentives: Number of incentives to select
-    :param epsilon: Epsilon value for random action selection
-    :return: Route edges, action selected, action index and incentive value.
+    :param q: Q-function (dictionary or array) mapping trip_id to Q-values
+    :param trip_id: ID of the trip for which the action is selected
+    :param actions_costs: Dictionary mapping trip_id to (routes, costs)
+    :param n_incentives: Number of available incentive levels
+    :param epsilon: Probability of choosing a random action
+
+    :return: (route_edges, selected_action, action_index, applied_incentive)
     """
-    if np.random.uniform() <= epsilon:
-        # Select random route and whether to incentivise or not
+    routes, costs = actions_costs[trip_id]
+    num_routes = len(costs)
+
+    if np.random.rand() <= epsilon:
         action_index = (
-            np.random.randint(len(actions_costs[trip_id][1])),
-            np.random.randint(n_incentives),
+            np.random.randint(num_routes),  # Random route index
+            np.random.randint(n_incentives),  # Random incentive index
         )
     else:
-        # Select action with highest Q-value
         action_index = np.unravel_index(np.argmax(q[trip_id]), np.shape(q[trip_id]))
 
-    if action_index[1] > 0:
-        incentive = (
-            actions_costs[trip_id][1][action_index[0]]
-            - min(actions_costs[trip_id][1])
-            + 1
-        )
+    route_idx, incentive_level = action_index
+
+    # Compute incentive to apply
+    if incentive_level > 0:
+        incentive = costs[route_idx] - min(costs) + 1
     else:
         incentive = 0
 
-    # Subtract incentive from original cost for selected route
-    actions_costs[trip_id][1][action_index[0]] -= incentive
-    # Select route after incentives
-    action = np.argmin(actions_costs[trip_id][1])
-    route_edges = actions_costs[trip_id][0][action][1]
-    return route_edges, action, action_index, incentive
+    # Apply incentive to cost
+    adjusted_costs = costs.copy()
+    adjusted_costs[route_idx] -= incentive
+
+    # Choose the route with the minimum adjusted cost
+    selected_action = int(np.argmin(adjusted_costs))
+    route_edges = routes[selected_action][1]
+
+    return route_edges, selected_action, action_index, incentive
 
 
 def step(routes_edges):
@@ -69,8 +75,8 @@ def step(routes_edges):
     tot_emission = co2_main("data/fcd.xml")
 
     return (
-        (get_TTT() / (60**2)),
-        normalise_dict(travelTimes()),
+        (get_ttt() / (60**2)),
+        normalise_dict(travel_times()),
         normalise_dict(emissions_func()),
         normalise_scalar(300, 330, tot_emission / 1000),
     )
@@ -81,9 +87,9 @@ def get_actions(file_path: str) -> dict:
     Parse an XML file and extract available vehicle routes and their costs.
 
     :param file_path: Path to the XML file.
-    :return:
-        - A dictionary mapping vehicle IDs to lists of (index, edge list) tuples
-            and costs
+
+    :return: A dictionary mapping vehicle IDs to lists of (index, edge list) tuples
+        and costs
     """
     tree = ET.parse(file_path)
     root = tree.getroot()
@@ -244,7 +250,7 @@ def write_routes(vehicle_routes, file="data/output.rou.xml"):
         f.write(pretty_xml_str)
 
 
-def get_TTT(file="data/stats.xml"):
+def get_ttt(file="data/stats.xml"):
     tree = ET.parse(file)
     root = tree.getroot()
 
@@ -253,7 +259,7 @@ def get_TTT(file="data/stats.xml"):
     return total_travel_time
 
 
-def travelTimes(file="data/tripinfo.xml"):
+def travel_times(file="data/tripinfo.xml"):
     # Parse the XML data
     tree = ET.parse(file)
     root = tree.getroot()
@@ -352,12 +358,12 @@ def initialise_q_function(actions_costs: dict, incentives_n: int) -> dict:
     """
     Initialise the Q-function.
 
-    :param actions_costs: dictionary that stores the possible routes for each
+    :param actions_costs: Dictionary that stores the possible routes for each
         trip and their cost
-    :param incentives_n: number of incentives options
+    :param incentives_n: Number of incentives options
+
     :return: initialised Q-function for every trip.
     """
-
     return {
         trip: np.zeros((len(action_cost[0]), incentives_n))
         for trip, action_cost in actions_costs.items()
@@ -375,31 +381,39 @@ def policy(
     budget: bool,
 ) -> tuple[dict, dict]:
     """
-    Policy function for the RL algorithm.
+    Policy function for the RL algorithm using epsilon-greedy strategy.
 
-    :param trips_id: list of trip IDs
-    :param q: Q-function
-    :param actions_costs: dictionary that stores the possible routes and costs
-    :param n_incentives: number of incentives options
-    :total_budget: total budget
-    :param budget: True if using incentives, False otherwise
-    :return: Routes' edges and actions' indexes
+    :param trips_id: List of trip IDs
+    :param q: Q-function mapping trip_id to Q-value array
+    :param actions_costs: Dictionary mapping trip_id to (routes, costs)
+    :param n_incentives: Number of incentive options
+    :param epsilon: Probability of choosing a random action
+    :param total_budget: Maximum total incentive budget
+    :param budget: Whether to enforce the incentive budget constraint
+
+    :return: Tuple containing:
+             - route_edges: mapping trip_id to selected route edges
+             - action_index: mapping trip_id to selected (route_idx, incentive_level)
     """
     route_edges = {}
-    action = {}
     action_index = {}
-    b = 0
-    for trip in trips_id:
-        route_edges[trip], action[trip], action_index[trip], incentive = (
-            eps_greedy_policy(q, trip, actions_costs, n_incentives, epsilon=epsilon)
+    current_budget = 0
+
+    for trip_id in trips_id:
+        selected_edges, selected_action, selected_index, incentive = eps_greedy_policy(
+            q, trip_id, actions_costs, n_incentives, epsilon
         )
-        if budget:
-            if (b + incentive) <= total_budget:
-                b += incentive
-            else:
-                action_index[trip] = (action_index[trip][0], 0)
-                action[trip] = np.argmin(actions_costs[trip][1])
-                route_edges[trip] = actions_costs[trip][0][action[trip]][1]
+
+        if budget and (current_budget + incentive > total_budget):
+            # Reset incentive if over budget
+            selected_index = (selected_index[0], 0)
+            selected_action = int(np.argmin(actions_costs[trip_id][1]))
+            selected_edges = actions_costs[trip_id][0][selected_action][1]
+            incentive = 0
+
+        current_budget += incentive
+        route_edges[trip_id] = selected_edges
+        action_index[trip_id] = selected_index
 
     return route_edges, action_index
 
@@ -471,7 +485,7 @@ def main():
     )
     ## vehicle_id -> [(index, edges), costs]
     # Start training the agent
-    for ep in range(episodes):
+    for _ in range(episodes):
         routes_edges, action_index = policy(
             trips_id=trips_id,
             q=q,
