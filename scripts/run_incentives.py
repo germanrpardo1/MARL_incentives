@@ -15,7 +15,7 @@ from co2Emissions.xmlreader import co2_main
 # TODO(German): Handle for when budget=False (or check it's handled)
 def eps_greedy_policy_no_incentives(
     q: dict, trip_id: str, actions_costs: dict, epsilon: float = 0.1
-) -> tuple[dict, int]:
+) -> tuple[list, int]:
     """
     Epsilon-greedy policy for selecting a route without incentives.
 
@@ -47,7 +47,7 @@ def eps_greedy_policy_no_incentives(
 
 def eps_greedy_policy_incentives(
     q: dict, trip_id: str, actions_costs: dict, n_incentives: int, epsilon: float = 0.1
-) -> tuple[dict, dict, dict, float]:
+) -> tuple[list, int, tuple[int, int], float]:
     """
     Epsilon-greedy policy for selecting a route with incentives.
 
@@ -59,16 +59,23 @@ def eps_greedy_policy_incentives(
 
     :return: (route_edges, selected_action, action_index, applied_incentive)
     """
+    # Unpack routes and costs
     routes, costs = actions_costs[trip_id]
     num_routes = len(costs)
 
-    if np.random.rand() <= epsilon:
+    # Define random generator
+    rng = np.random.default_rng(seed=52)
+    # Perform random action with probability epsilon
+    if rng.random() <= epsilon:
         action_index = (
-            np.random.randint(num_routes),  # Random route index
-            np.random.randint(n_incentives),  # Random incentive index
+            int(rng.integers(num_routes)),  # Random route index
+            int(rng.integers(n_incentives)),  # Random incentive index
         )
+    # Perform action with maximum Q-value with probability 1 - epsilon
     else:
-        action_index = np.unravel_index(np.argmax(q[trip_id]), np.shape(q[trip_id]))
+        action_index = np.unravel_index(
+            int(np.argmax(q[trip_id])), np.shape(q[trip_id])
+        )
 
     route_idx, incentive_level = action_index
 
