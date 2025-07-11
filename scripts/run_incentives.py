@@ -9,25 +9,25 @@ from xml.dom import minidom
 import subprocess
 import sumolib
 import yaml
+from cfgv import Array
+
 from co2Emissions.xmlreader import co2_main
 
 
-# TODO(German): Handle for when budget=False (or check it's handled)
 def eps_greedy_policy_no_incentives(
-    q: dict, trip_id: str, actions_costs: dict, epsilon: float = 0.1
+    q: dict, actions_costs: dict, epsilon: float = 0.1
 ) -> tuple[list, int]:
     """
     Epsilon-greedy policy for selecting a route without incentives.
 
-    :param q: Q-function (dictionary or array) mapping trip_id to Q-values
-    :param trip_id: ID of the trip for which the action is selected
-    :param actions_costs: Dictionary mapping trip_id to (routes, costs)
+    :param q: Q-values corresponding to a given trip_id
+    :param actions_costs: Routes and costs corresponding to a given trip_id
     :param epsilon: Probability of choosing a random action
 
     :return: (route_edges, selected_action, action_index)
     """
     # Unpack routes and costs
-    routes, costs = actions_costs[trip_id]
+    routes, costs = actions_costs
     num_routes = len(costs)
 
     # Define random generator
@@ -38,7 +38,7 @@ def eps_greedy_policy_no_incentives(
         route_idx = int(rng.integers(num_routes))
     # Perform action with maximum Q-value with probability 1 - epsilon
     else:
-        route_idx = np.argmax(q[trip_id])
+        route_idx = np.argmin(q)
 
     # Get route edges to write them in the .XML file
     route_edges = routes[route_idx][1]
@@ -46,21 +46,20 @@ def eps_greedy_policy_no_incentives(
 
 
 def eps_greedy_policy_incentives(
-    q: dict, trip_id: str, actions_costs: dict, n_incentives: int, epsilon: float = 0.1
+    q: Array, actions_costs: tuple[list, list], n_incentives: int, epsilon: float = 0.1
 ) -> tuple[list, int, tuple[int, int], float]:
     """
     Epsilon-greedy policy for selecting a route with incentives.
 
-    :param q: Q-function (dictionary or array) mapping trip_id to Q-values
-    :param trip_id: ID of the trip for which the action is selected
-    :param actions_costs: Dictionary mapping trip_id to (routes, costs)
+    :param q: Q-values corresponding to a given trip_id
+    :param actions_costs: Routes and costs corresponding to a given trip_id
     :param n_incentives: Number of available incentive levels
     :param epsilon: Probability of choosing a random action
 
     :return: (route_edges, selected_action, action_index, applied_incentive)
     """
     # Unpack routes and costs
-    routes, costs = actions_costs[trip_id]
+    routes, costs = actions_costs
     num_routes = len(costs)
 
     # Define random generator
@@ -73,9 +72,7 @@ def eps_greedy_policy_incentives(
         )
     # Perform action with maximum Q-value with probability 1 - epsilon
     else:
-        action_index = np.unravel_index(
-            int(np.argmax(q[trip_id])), np.shape(q[trip_id])
-        )
+        action_index = np.unravel_index(int(np.argmin(q)), np.shape(q))
 
     route_idx, incentive_level = action_index
 
@@ -439,7 +436,7 @@ def policy(
     for trip_id in trips_id:
         selected_edges, selected_action, selected_index, incentive = (
             eps_greedy_policy_incentives(
-                q, trip_id, actions_costs, n_incentives, epsilon
+                q[trip_id], actions_costs[trip_id], n_incentives, epsilon
             )
         )
 
@@ -492,7 +489,7 @@ def main():
     # Setting weights of the objective function
     ttt_weight = config["TTT_weight"]
     individual_travel_time_weight = config["individual_travel_time_weight"]
-    emissions_weight = config["emissions_weight"]
+    individual_emissions_weight = config["emissions_weight"]
     total_emissions_weight = config["total_emissions_weight"]
 
     n_incentives = config["n_incentives"]
@@ -544,10 +541,14 @@ def main():
         # For each agent update Q function
         # Q(a) = Q(a) + alpha * (r - Q(a))
         for trip in trips_id:
-            r = -(
+            r = (
+                # Individual travel time objective
                 individual_travel_time_weight * ind_travel_times[trip]
+                # Total travel time objective
                 + ttt_weight * ttt
-                + emissions_weight * emissions[trip]
+                # Individual emissions objective
+                + individual_emissions_weight * emissions[trip]
+                # Total emissions objective
                 + total_emissions_weight * tot_emission
             )
 
