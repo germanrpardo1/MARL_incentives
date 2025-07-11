@@ -8,18 +8,48 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import subprocess
 import sumolib
-import copy
 import yaml
 from co2Emissions.xmlreader import co2_main
-import pickle
 
 
 # TODO(German): Handle for when budget=False (or check it's handled)
-def eps_greedy_policy(
+def eps_greedy_policy_no_incentives(
+    q: dict, trip_id: str, actions_costs: dict, epsilon: float = 0.1
+) -> tuple[dict, int]:
+    """
+    Epsilon-greedy policy for selecting a route without incentives.
+
+    :param q: Q-function (dictionary or array) mapping trip_id to Q-values
+    :param trip_id: ID of the trip for which the action is selected
+    :param actions_costs: Dictionary mapping trip_id to (routes, costs)
+    :param epsilon: Probability of choosing a random action
+
+    :return: (route_edges, selected_action, action_index)
+    """
+    # Unpack routes and costs
+    routes, costs = actions_costs[trip_id]
+    num_routes = len(costs)
+
+    # Define random generator
+    rng = np.random.default_rng(seed=52)
+
+    # Perform random action with probability epsilon
+    if rng.random() <= epsilon:
+        route_idx = int(rng.integers(num_routes))
+    # Perform action with maximum Q-value with probability 1 - epsilon
+    else:
+        route_idx = np.argmax(q[trip_id])
+
+    # Get route edges to write them in the .XML file
+    route_edges = routes[route_idx][1]
+    return route_edges, route_idx
+
+
+def eps_greedy_policy_incentives(
     q: dict, trip_id: str, actions_costs: dict, n_incentives: int, epsilon: float = 0.1
 ) -> tuple[dict, dict, dict, float]:
     """
-    Epsilon-greedy policy for selecting an action.
+    Epsilon-greedy policy for selecting a route with incentives.
 
     :param q: Q-function (dictionary or array) mapping trip_id to Q-values
     :param trip_id: ID of the trip for which the action is selected
@@ -400,8 +430,10 @@ def policy(
     current_budget = 0
 
     for trip_id in trips_id:
-        selected_edges, selected_action, selected_index, incentive = eps_greedy_policy(
-            q, trip_id, actions_costs, n_incentives, epsilon
+        selected_edges, selected_action, selected_index, incentive = (
+            eps_greedy_policy_incentives(
+                q, trip_id, actions_costs, n_incentives, epsilon
+            )
         )
 
         if budget and (current_budget + incentive > total_budget):
