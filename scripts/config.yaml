@@ -4,7 +4,7 @@ output_rou_alt_path: "data/output.rou.alt.xml"
 
 
 # Number of training episodes for the RL agent
-episodes: 2
+episodes: 1
 
 ### Weights for different components of the reward/cost function
 # Weight for Total Travel Time (TTT) of the network
@@ -25,8 +25,8 @@ epsilon: 0.9
 decay: 0.996
 # Learning rate (α) for Q-learning or other value update algorithms
 alpha: 0.1
-# Available budget for incentives or policies (can be used as a constraint)
-B: 100
-# Whether to enforce budget constraints during training
-budget: true
+# Total available budget for incentives or policies (can be used as a constraint)
+total_budget: 100
+# Whether to use incentives or not
+incentives_mode: true
 

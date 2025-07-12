@@ -46,45 +46,39 @@ def eps_greedy_policy_no_incentives(
 
 
 def eps_greedy_policy_incentives(
-    q: Array, actions_costs: tuple[list, list], n_incentives: int, epsilon: float = 0.1
-) -> tuple[list, int, tuple[int, int], float]:
+    q: Array, actions_costs: tuple[list, list], num_routes: int, epsilon: float = 0.1
+) -> tuple[list, int, int, float]:
     """
     Epsilon-greedy policy for selecting a route with incentives.
 
     :param q: Q-values corresponding to a given trip_id
     :param actions_costs: Routes and costs corresponding to a given trip_id
-    :param n_incentives: Number of available incentive levels
+    :param num_routes: Number of routes available
     :param epsilon: Probability of choosing a random action
 
     :return: (route_edges, selected_action, action_index, applied_incentive)
     """
     # Unpack routes and costs
     routes, costs = actions_costs
-    num_routes = len(costs)
 
     # Define random generator
-    rng = np.random.default_rng(seed=52)
+    rng = np.random.default_rng()
     # Perform random action with probability epsilon
     if rng.random() <= epsilon:
-        action_index = (
-            int(rng.integers(num_routes)),  # Random route index
-            int(rng.integers(n_incentives)),  # Random incentive index
-        )
+        random_int = rng.integers(num_routes + 1)
+        action_index = int(random_int)  # Random action index
     # Perform action with maximum Q-value with probability 1 - epsilon
     else:
-        action_index = np.unravel_index(int(np.argmin(q)), np.shape(q))
+        action_index = np.argmin(q)
 
-    route_idx, incentive_level = action_index
-
+    adjusted_costs = costs.copy()
     # Compute incentive to apply
-    if incentive_level > 0:
-        incentive = costs[route_idx] - min(costs) + 1
+    if action_index + 1 <= num_routes:
+        incentive = costs[action_index] - min(costs) + 1
+        # Apply incentive to cost
+        adjusted_costs[action_index] -= incentive
     else:
         incentive = 0
-
-    # Apply incentive to cost
-    adjusted_costs = costs.copy()
-    adjusted_costs[route_idx] -= incentive
 
     # Choose the route with the minimum adjusted cost
     selected_action = int(np.argmin(adjusted_costs))
@@ -388,31 +382,28 @@ def emissions_func(file_path="data/emissions_per_vehicle.txt"):
     return vehicle_emission
 
 
-def initialise_q_function(actions_costs: dict, incentives_n: int) -> dict:
+def initialise_q_function_incentives(actions_costs: dict) -> dict:
     """
     Initialise the Q-function.
 
     :param actions_costs: Dictionary that stores the possible routes for each
         trip and their cost
-    :param incentives_n: Number of incentives options
 
     :return: initialised Q-function for every trip.
     """
     return {
-        trip: np.zeros((len(action_cost[0]), incentives_n))
+        trip: np.zeros((len(action_cost[0]) + 1))
         for trip, action_cost in actions_costs.items()
     }
 
 
-def policy(
+def policy_incentives(
     trips_id: list,
     q: dict,
     actions_costs: dict,
     n_incentives: int,
     epsilon: float,
     total_budget: float,
-    *,
-    budget: bool,
 ) -> tuple[dict, dict]:
     """
     Policy function for the RL algorithm using epsilon-greedy strategy.
@@ -423,35 +414,35 @@ def policy(
     :param n_incentives: Number of incentive options
     :param epsilon: Probability of choosing a random action
     :param total_budget: Maximum total incentive budget
-    :param budget: Whether to enforce the incentive budget constraint
 
     :return: Tuple containing:
              - route_edges: mapping trip_id to selected route edges
-             - action_index: mapping trip_id to selected (route_idx, incentive_level)
+             - actions_index: mapping trip_id to selected (route_idx, incentive_level)
     """
     route_edges = {}
-    action_index = {}
+    actions_index = {}
     current_budget = 0
 
     for trip_id in trips_id:
+        # Number of routes for the trip_id
+        num_routes = len(actions_costs[trip_id][1])
         selected_edges, selected_action, selected_index, incentive = (
             eps_greedy_policy_incentives(
-                q[trip_id], actions_costs[trip_id], n_incentives, epsilon
+                q[trip_id], actions_costs[trip_id], num_routes, epsilon
             )
         )
 
-        if budget and (current_budget + incentive > total_budget):
+        if current_budget + incentive > total_budget:
             # Reset incentive if over budget
-            selected_index = (selected_index[0], 0)
             selected_action = int(np.argmin(actions_costs[trip_id][1]))
             selected_edges = actions_costs[trip_id][0][selected_action][1]
             incentive = 0
 
         current_budget += incentive
         route_edges[trip_id] = selected_edges
-        action_index[trip_id] = selected_index
+        actions_index[trip_id] = selected_index
 
-    return route_edges, action_index
+    return route_edges, actions_index
 
 
 def prob_calc(costs, theta=-0.01):
@@ -479,7 +470,7 @@ def running_average(data, window_size):
 window_size = 20  # Choose a window size
 
 
-def main():
+def main_incentives():
     with open("scripts/config.yaml", "r") as file:
         config = yaml.safe_load(file)
 
@@ -500,8 +491,7 @@ def main():
     alpha = config["alpha"]
 
     # Setting parameters for budget
-    total_budget = config["B"]
-    budget = config["budget"]
+    total_budget = config["total_budget"]
 
     # Path for output_rou_alt
     output_rou_alt_path = config["output_rou_alt_path"]
@@ -516,20 +506,17 @@ def main():
     emissions_total = []
 
     # Initialise the Q-function
-    q = initialise_q_function(
-        actions_costs=actions_and_costs, incentives_n=n_incentives
-    )
+    q_values = initialise_q_function_incentives(actions_costs=actions_and_costs)
     ## vehicle_id -> [(index, edges), costs]
     # Start training the agent
     for _ in range(episodes):
-        routes_edges, action_index = policy(
+        routes_edges, actions_index = policy_incentives(
             trips_id=trips_id,
-            q=q,
+            q=q_values,
             actions_costs=actions_and_costs,
             n_incentives=n_incentives,
             epsilon=epsilon,
             total_budget=total_budget,
-            budget=budget,
         )
 
         # Run a simulation to evaluate the actions selected
@@ -552,8 +539,8 @@ def main():
                 + total_emissions_weight * tot_emission
             )
 
-            q[trip][action_index[trip]] = (1 - alpha) * q[trip][
-                action_index[trip]
+            q_values[trip][actions_index[trip]] = (1 - alpha) * q_values[trip][
+                actions_index[trip]
             ] + alpha * r
 
         epsilon = max(0.01, epsilon * decay)
@@ -564,4 +551,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main_incentives()
