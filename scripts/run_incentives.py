@@ -401,7 +401,6 @@ def policy_incentives(
     trips_id: list,
     q: dict,
     actions_costs: dict,
-    n_incentives: int,
     epsilon: float,
     total_budget: float,
 ) -> tuple[dict, dict]:
@@ -426,18 +425,20 @@ def policy_incentives(
     for trip_id in trips_id:
         # Number of routes for the trip_id
         num_routes = len(actions_costs[trip_id][1])
+        # Take action from Epsilon Greedy policy
         selected_edges, selected_action, selected_index, incentive = (
             eps_greedy_policy_incentives(
                 q[trip_id], actions_costs[trip_id], num_routes, epsilon
             )
         )
-
+        # If there is no budget left, don't incentivise
         if current_budget + incentive > total_budget:
             # Reset incentive if over budget
             selected_action = int(np.argmin(actions_costs[trip_id][1]))
             selected_edges = actions_costs[trip_id][0][selected_action][1]
             incentive = 0
 
+        # Update budget used
         current_budget += incentive
         route_edges[trip_id] = selected_edges
         actions_index[trip_id] = selected_index
@@ -483,8 +484,6 @@ def main_incentives():
     individual_emissions_weight = config["emissions_weight"]
     total_emissions_weight = config["total_emissions_weight"]
 
-    n_incentives = config["n_incentives"]
-
     # RL hyper-parameters
     epsilon = config["epsilon"]
     decay = config["decay"]
@@ -514,7 +513,6 @@ def main_incentives():
             trips_id=trips_id,
             q=q_values,
             actions_costs=actions_and_costs,
-            n_incentives=n_incentives,
             epsilon=epsilon,
             total_budget=total_budget,
         )
