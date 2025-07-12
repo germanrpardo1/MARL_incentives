@@ -87,20 +87,38 @@ def eps_greedy_policy_incentives(
     return route_edges, selected_action, action_index, incentive
 
 
-def step(routes_edges):
-    write_routes(routes_edges)
-    write_edge_data_config(
-        filename="data/edge_data.add.xml", freq=500, file="edge_data.add.xml"
-    )
-    write_sumo_config(
-        filename="data/config.sumocfg",
-        net_file="data/kamppi.net.xml",
-        route_files="data/output.rou.xml",
-        weight_file="data/weights.xml",
-        additional_files="edge_data.add.xml",
-    )
-    run_simulation()
-    tot_emission = co2_main("data/fcd.xml")
+# TODO(German): Store all paths in a dict.
+def step(
+    edge_data_frequency: int,
+    routes_edges: dict,
+    routes_file_path: str,
+    edge_data_path: str,
+    log_path: str,
+    emissions_path: str,
+    sumo_params: dict,
+) -> tuple[float, dict, dict, float]:
+    """
+    Perform the action taken.
+
+    Write the routes for all travellers in a .XML file, write
+        the SUMO config, run a simulation in SUMO
+        and calculate emissions
+
+    :param edge_data_frequency: Frequency of edge data (seconds).
+    :param routes_edges: Routes edges corresponding to all trip_ids
+    :param routes_file_path: Path to write the routes .XML file
+    :param edge_data_path: Path to write the edge data .xml file
+    :param log_path: Path to write log file
+    :param emissions_path: Path to write emissions .xml file
+    :param sumo_params: Parameters to run SUMO
+    return: Total travel time, individual travel times, individual
+        emissions and total emissions.
+    """
+    write_routes(routes_edges=routes_edges, file=routes_file_path)
+    write_edge_data_config(filename=edge_data_path, freq=edge_data_frequency)
+    write_sumo_config(**sumo_params)
+    run_simulation(log_path=log_path, sumo_config_path=sumo_params["config_path"])
+    tot_emission = co2_main(emissions_path)
 
     return (
         (get_ttt() / (60**2)),
@@ -148,37 +166,58 @@ def get_actions(file_path: str) -> dict:
     return vehicle_routes_and_costs
 
 
-def run_simulation():
-    sys.stdout = sumolib.TeeFile(sys.stdout, open("data/log.xml", "w+"))
-    log = open("data/log.xml", "w+")
+def run_simulation(log_path: str, sumo_config_path: str) -> None:
+    """
+    Run a SUMO simulation.
+
+    :param log_path: Path to log file.
+    :param sumo_config_path: Path to SUMO configuration file.
+    """
+    sys.stdout = sumolib.TeeFile(sys.stdout, open(log_path, "w+"))
+    log = open(log_path, "w+")
 
     log.flush()
     sys.stdout.flush()
 
-    sumo_cmd = ["sumo", "-c", "data/config.sumocfg"]
+    sumo_cmd = ["sumo", "-c", sumo_config_path]
 
     sumo_cmd = list(map(str, sumo_cmd))
     subprocess.call(sumo_cmd, stdout=log, stderr=log)
 
 
-def write_sumo_config(filename, net_file, route_files, weight_file, additional_files):
+def write_sumo_config(
+    config_path: str,
+    network_path: str,
+    routes_path: str,
+    edges_weights_path: str,
+    edge_frequency_path: str,
+) -> None:
+    """
+    Write SUMO configuration file.
+
+    :param config_path: Path to the configuration file.
+    :param network_path: Path to the network file.
+    :param routes_path: Path to the routes file.
+    :param edges_weights_path: Path to the edges weights file.
+    :param edge_frequency_path: Path to the edge frequency file.
+    """
     sumo_cmd = [
         "sumo",
         "-n",
-        net_file,
+        network_path,
         "-r",
-        route_files,
+        routes_path,
         "--save-configuration",
-        filename,
+        config_path,
         "--edgedata-output",
-        str(weight_file),
+        str(edges_weights_path),
         "--tripinfo-output",
         str(Path("data") / "tripinfo.xml"),
         "--log",
         str(Path("data") / "log.xml"),
         "--no-step-log",
         "--additional-files",
-        additional_files,
+        edge_frequency_path,
         "--begin",
         "0",
         "--route-steps",
@@ -205,7 +244,13 @@ def write_sumo_config(filename, net_file, route_files, weight_file, additional_f
     subprocess.call(sumo_cmd, stdout=subprocess.PIPE)
 
 
-def write_edge_data_config(filename, freq, file):
+def write_edge_data_config(filename, freq):
+    """
+    Write config for edge data granularity.
+
+    :param filename: Path to the output file.
+    :param freq: Edge data granularity.
+    """
     # Create the root element
     root = ET.Element("a")
 
@@ -216,27 +261,28 @@ def write_edge_data_config(filename, freq, file):
         {
             "id": "edge_data",
             "freq": str(freq),
-            "file": file,
             "excludeEmpty": "True",
             "minSamples": "1",
         },
     )
-
     # Create the XML tree
     ET.ElementTree(root)
-
     # Convert to string
     xml_str = ET.tostring(root, encoding="unicode")
-
     # Parse the string with minidom for pretty printing
     pretty_xml_str = minidom.parseString(xml_str).toprettyxml(indent="    ")
-
     # Write to file
     with open(filename, "w", encoding="utf-8") as file:
         file.write(pretty_xml_str)
 
 
-def write_routes(vehicle_routes, file="data/output.rou.xml"):
+def write_routes(routes_edges: dict, file="data/output.rou.xml") -> None:
+    """
+    Write all the routes to a .XML file.
+
+    :param routes_edges: Dictionary containing all the edges for every trip
+    :param file: Path to the output file
+    """
     # Create the root element
     routes_element = ET.Element("routes")
     routes_element.set("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance")
@@ -255,7 +301,7 @@ def write_routes(vehicle_routes, file="data/output.rou.xml"):
 
     # Add vehicles and their routes to the XML
     counter = 0
-    for vehicle_id, edges in vehicle_routes.items():
+    for vehicle_id, edges in routes_edges.items():
         vehicle_element = ET.SubElement(routes_element, "vehicle")
         vehicle_element.set("id", vehicle_id)
         vehicle_element.set("type", "type1")
@@ -422,22 +468,23 @@ def policy_incentives(
     current_budget = 0
 
     for trip_id in trips_id:
-        # Number of routes for the trip_id
-        num_routes = len(actions_costs[trip_id][1])
-        # Take action from Epsilon Greedy policy
+        routes, costs = actions_costs[trip_id]
+        num_routes = len(costs)
+
+        # Select action using epsilon-greedy strategy
         selected_edges, selected_action, selected_index, incentive = (
             eps_greedy_policy_incentives(
                 q[trip_id], actions_costs[trip_id], num_routes, epsilon
             )
         )
-        # If there is no budget left, don't incentivise
+
+        # Enforce budget constraint
         if current_budget + incentive > total_budget:
-            # Reset incentive if over budget
-            selected_action = int(np.argmin(actions_costs[trip_id][1]))
-            selected_edges = actions_costs[trip_id][0][selected_action][1]
+            selected_action = int(np.argmin(costs))
+            selected_edges = routes[selected_action][1]
             incentive = 0
 
-        # Update budget used
+        # Update budget and tracking dictionaries
         current_budget += incentive
         route_edges[trip_id] = selected_edges
         actions_index[trip_id] = selected_index
@@ -493,6 +540,18 @@ def main_incentives():
 
     # Path for output_rou_alt
     output_rou_alt_path = config["output_rou_alt_path"]
+    # Path for output_rou
+    routes_file_path = config["output_rou_path"]
+    # Path for edge data frequency
+    edge_data_path = config["edge_data_path"]
+    log_path = config["log_path"]
+    emissions_path = config["emissions_path"]
+
+    # Frequency of the edge data
+    edge_data_frequency = config["edge_data_frequency"]
+
+    # Parameters to run SUMO
+    sumo_params = config["sumo_config"]
 
     # Getting available actions based on pre-computed routes
     actions_and_costs = get_actions(file_path=output_rou_alt_path)
@@ -517,7 +576,15 @@ def main_incentives():
         )
 
         # Run a simulation to evaluate the actions selected
-        ttt, ind_travel_times, emissions, tot_emission = step(routes_edges=routes_edges)
+        ttt, ind_travel_times, emissions, tot_emission = step(
+            edge_data_frequency=edge_data_frequency,
+            routes_edges=routes_edges,
+            routes_file_path=routes_file_path,
+            edge_data_path=edge_data_path,
+            log_path=log_path,
+            emissions_path=emissions_path,
+            sumo_params=sumo_params,
+        )
 
         ttts.append(ttt)
         emissions_total.append(tot_emission * 30 + 300)
@@ -525,20 +592,18 @@ def main_incentives():
         # For each agent update Q function
         # Q(a) = Q(a) + alpha * (r - Q(a))
         for trip in trips_id:
-            r = (
-                # Individual travel time objective
+            index = actions_index[trip]
+
+            # Compute reward
+            reward = (
                 individual_travel_time_weight * ind_travel_times[trip]
-                # Total travel time objective
                 + ttt_weight * ttt
-                # Individual emissions objective
                 + individual_emissions_weight * emissions[trip]
-                # Total emissions objective
                 + total_emissions_weight * tot_emission
             )
 
-            q_values[trip][actions_index[trip]] = (1 - alpha) * q_values[trip][
-                actions_index[trip]
-            ] + alpha * r
+            # Update Q-value
+            q_values[trip][index] = (1 - alpha) * q_values[trip][index] + alpha * reward
 
         epsilon = max(0.01, epsilon * decay)
 

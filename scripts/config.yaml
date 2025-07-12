@@ -1,7 +1,25 @@
 # Path of output.rou.alt file
 output_rou_alt_path: "data/output.rou.alt.xml"
+# Path of output.rou file
+output_rou_path: "data/output.rou.xml"
+# Path for edge data frequency config
+edge_data_path: "data/edge_data.add.xml"
+# Path for SUMO log
+log_path: "data/log.xml"
+# Path to write emissions data
+emissions_path: "data/fcd.xml"
+
+# Parameters needed to run SUMO
+sumo_config:
+  config_path: "data/config.sumocfg"
+  network_path: "data/kamppi.net.xml"
+  routes_path: "data/output.rou.xml"
+  edges_weights_path: "data/weights.xml"
+  edge_frequency_path: "edge_data.add.xml"
 
 
+# Edge data frequency
+edge_data_frequency: 500
 
 # Number of training episodes for the RL agent
 episodes: 1
@@ -12,7 +30,7 @@ TTT_weight: 0
 # Weight for individual travel time of each agent
 individual_travel_time_weight: 0.5
 # Weight for minimising individual emissions
-emissions_weight: 0.5
+emissions_weight: 0
 # Total emissions weight
 total_emissions_weight: 0
 
