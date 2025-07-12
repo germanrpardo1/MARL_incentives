@@ -410,7 +410,6 @@ def policy_incentives(
     :param trips_id: List of trip IDs
     :param q: Q-function mapping trip_id to Q-value array
     :param actions_costs: Dictionary mapping trip_id to (routes, costs)
-    :param n_incentives: Number of incentive options
     :param epsilon: Probability of choosing a random action
     :param total_budget: Maximum total incentive budget
 
