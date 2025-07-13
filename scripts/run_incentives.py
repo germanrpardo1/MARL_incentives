@@ -31,7 +31,7 @@ def eps_greedy_policy_no_incentives(
     num_routes = len(costs)
 
     # Define random generator
-    rng = np.random.default_rng(seed=52)
+    rng = np.random.default_rng()
 
     # Perform random action with probability epsilon
     if rng.random() <= epsilon:
@@ -94,47 +94,39 @@ def step(
     sumo_params: dict,
 ) -> tuple[float, dict, dict, float]:
     """
-    Perform the action taken.
+    Perform one SUMO simulation step:
+    - Write route and configuration files
+    - Run the SUMO simulation
+    - Process travel time and emission outputs
 
-    Write the routes for all travellers in a .XML file, write
-        the SUMO config, run a simulation in SUMO
-        and calculate emissions
-
-    :param edge_data_frequency: Frequency of edge data (seconds).
-    :param routes_edges: Routes edges corresponding to all trip_ids
-    :param paths_dict: Paths to the following: routes .XML file,
-        edge data .edge data .xml file, log file and emissions .xml file
-    :param sumo_params: Parameters to run SUMO
-    return: Total travel time, individual travel times, individual
-        emissions and total emissions.
+    :param edge_data_frequency: Frequency of edge data (in seconds)
+    :param routes_edges: Route edges for each trip_id
+    :param paths_dict: Dict of paths (routes file, edge data, emissions, etc.)
+    :param sumo_params: SUMO simulation configuration
+    :return: Tuple of (total travel time, normalised individual travel times,
+                      normalised individual emissions, normalised total emissions)
     """
-    # Write the selected routes in a .XML file
-    write_routes(routes_edges=routes_edges, file=paths_dict["routes_file_path"])
-    # Write configuration for edge data granularity
-    write_edge_data_config(
-        filename=paths_dict["edge_data_path"], freq=edge_data_frequency
-    )
-    # Write sumo configuration
+    # Write input and configuration files
+    write_routes(routes_edges, paths_dict["routes_file_path"])
+    write_edge_data_config(paths_dict["edge_data_path"], edge_data_frequency)
     write_sumo_config(**sumo_params)
-    # Run the SUMO simulation
-    run_simulation(
-        log_path=paths_dict["log_path"], sumo_config_path=sumo_params["config_path"]
-    )
-    # Calculate emissions
-    tot_emission = co2_main(paths_dict["emissions_path"])
 
-    return (
-        (get_ttt(file=paths_dict["stats_path"])),
-        normalise_dict(
-            dict_to_normalise=get_individual_travel_times(
-                file=paths_dict["trip_info_path"]
-            )
-        ),
-        normalise_dict(
-            emissions_func(file_path=paths_dict["emissions_per_vehicle_path"])
-        ),
-        normalise_scalar(min_val=300, max_val=330, val=tot_emission / 1000),
+    # Run SUMO simulation
+    run_simulation(paths_dict["log_path"], sumo_params["config_path"])
+
+    # Process outputs
+    total_tt = get_ttt(paths_dict["stats_path"])
+    individual_tt = normalise_dict(
+        get_individual_travel_times(paths_dict["trip_info_path"])
     )
+    individual_emissions = normalise_dict(
+        calculate_emissions_per_vehicle(paths_dict["emissions_per_vehicle_path"])
+    )
+    total_emissions = normalise_scalar(
+        min_val=300, max_val=330, val=co2_main(paths_dict["emissions_path"]) / 1000
+    )
+
+    return total_tt, individual_tt, individual_emissions, total_emissions
 
 
 def get_actions(file_path: str) -> dict:
@@ -253,7 +245,7 @@ def write_sumo_config(
     subprocess.call(sumo_cmd, stdout=subprocess.PIPE)
 
 
-def write_edge_data_config(filename, freq):
+def write_edge_data_config(filename: str, freq: int) -> None:
     """
     Write config for edge data granularity.
 
@@ -285,7 +277,7 @@ def write_edge_data_config(filename, freq):
         file.write(pretty_xml_str)
 
 
-def write_routes(routes_edges: dict, file="data/output.rou.xml") -> None:
+def write_routes(routes_edges: dict, file: str = "data/output.rou.xml") -> None:
     """
     Write all the routes to a .XML file.
 
@@ -417,7 +409,7 @@ def calculate_route_cost(actions, weights):
     return costs_r
 
 
-def emissions_func(file_path="data/emissions_per_vehicle.txt") -> dict:
+def calculate_emissions_per_vehicle(file_path="data/emissions_per_vehicle.txt") -> dict:
     """
     Calculate emissions per vehicle after SUMO simulation.
 
@@ -516,12 +508,6 @@ def policy_incentives(
     return route_edges, actions_index
 
 
-def prob_calc(costs, theta=-0.01):
-    sum_ = sum(np.exp(i * theta) for i in costs)
-    probs = [np.exp(cost * theta) / (sum_) for cost in costs]
-    return probs
-
-
 def normalise_dict(dict_to_normalise: dict) -> dict:
     """
     Normalise the values in the dictionary.
@@ -547,14 +533,6 @@ def normalise_scalar(min_val: float, max_val: float, val: float) -> float:
     :return: Normalised scalar value.
     """
     return (val - min_val) / (max_val - min_val)
-
-
-def running_average(data, window_size):
-    return np.convolve(data, np.ones(window_size) / window_size, mode="valid")
-
-
-# Set the window size (for running average)
-window_size = 20  # Choose a window size
 
 
 def main_incentives():
@@ -601,6 +579,7 @@ def main_incentives():
     ## vehicle_id -> [(index, edges), costs]
     # Start training the agent
     for _ in range(episodes):
+        # Policy function decides the next actions to take
         routes_edges, actions_index = policy_incentives(
             trips_id=trips_id,
             q=q_values,
@@ -610,14 +589,19 @@ def main_incentives():
         )
 
         # Run a simulation to evaluate the actions selected
-        ttt, ind_travel_times, emissions, tot_emission = step(
+        (
+            total_travel_time,
+            individual_travel_times,
+            individual_emissions,
+            tot_emission,
+        ) = step(
             edge_data_frequency=edge_data_frequency,
             routes_edges=routes_edges,
             paths_dict=paths_dict,
             sumo_params=sumo_params,
         )
 
-        ttts.append(ttt)
+        ttts.append(total_travel_time)
         emissions_total.append(tot_emission * 30 + 300)
 
         # For each agent update Q function
@@ -627,9 +611,9 @@ def main_incentives():
 
             # Compute reward
             reward = (
-                individual_travel_time_weight * ind_travel_times[trip]
-                + ttt_weight * ttt
-                + individual_emissions_weight * emissions[trip]
+                individual_travel_time_weight * individual_travel_times[trip]
+                + ttt_weight * total_travel_time
+                + individual_emissions_weight * individual_emissions[trip]
                 + total_emissions_weight * tot_emission
             )
 
@@ -639,7 +623,6 @@ def main_incentives():
         epsilon = max(0.01, epsilon * decay)
 
         # Retrieve updated route costs
-        # TODO(German): fix line below
         # costs = calculate_route_cost(actions, parse_weights("data/weights.xml"))
 
 

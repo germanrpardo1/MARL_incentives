@@ -24,6 +24,8 @@ sumo_config:
   edges_weights_path: "data/weights.xml"
   edge_frequency_path: "edge_data.add.xml"
 
+# Random seed
+seed: 52
 
 # Edge data frequency
 edge_data_frequency: 500
