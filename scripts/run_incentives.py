@@ -87,14 +87,10 @@ def eps_greedy_policy_incentives(
     return route_edges, selected_action, action_index, incentive
 
 
-# TODO(German): Store all paths in a dict.
 def step(
     edge_data_frequency: int,
     routes_edges: dict,
-    routes_file_path: str,
-    edge_data_path: str,
-    log_path: str,
-    emissions_path: str,
+    paths_dict: dict,
     sumo_params: dict,
 ) -> tuple[float, dict, dict, float]:
     """
@@ -106,25 +102,38 @@ def step(
 
     :param edge_data_frequency: Frequency of edge data (seconds).
     :param routes_edges: Routes edges corresponding to all trip_ids
-    :param routes_file_path: Path to write the routes .XML file
-    :param edge_data_path: Path to write the edge data .xml file
-    :param log_path: Path to write log file
-    :param emissions_path: Path to write emissions .xml file
+    :param paths_dict: Paths to the following: routes .XML file,
+        edge data .edge data .xml file, log file and emissions .xml file
     :param sumo_params: Parameters to run SUMO
     return: Total travel time, individual travel times, individual
         emissions and total emissions.
     """
-    write_routes(routes_edges=routes_edges, file=routes_file_path)
-    write_edge_data_config(filename=edge_data_path, freq=edge_data_frequency)
+    # Write the selected routes in a .XML file
+    write_routes(routes_edges=routes_edges, file=paths_dict["routes_file_path"])
+    # Write configuration for edge data granularity
+    write_edge_data_config(
+        filename=paths_dict["edge_data_path"], freq=edge_data_frequency
+    )
+    # Write sumo configuration
     write_sumo_config(**sumo_params)
-    run_simulation(log_path=log_path, sumo_config_path=sumo_params["config_path"])
-    tot_emission = co2_main(emissions_path)
+    # Run the SUMO simulation
+    run_simulation(
+        log_path=paths_dict["log_path"], sumo_config_path=sumo_params["config_path"]
+    )
+    # Calculate emissions
+    tot_emission = co2_main(paths_dict["emissions_path"])
 
     return (
-        (get_ttt() / (60**2)),
-        normalise_dict(travel_times()),
-        normalise_dict(emissions_func()),
-        normalise_scalar(300, 330, tot_emission / 1000),
+        (get_ttt(file=paths_dict["stats_path"])),
+        normalise_dict(
+            dict_to_normalise=get_individual_travel_times(
+                file=paths_dict["trip_info_path"]
+            )
+        ),
+        normalise_dict(
+            emissions_func(file_path=paths_dict["emissions_per_vehicle_path"])
+        ),
+        normalise_scalar(min_val=300, max_val=330, val=tot_emission / 1000),
     )
 
 
@@ -325,15 +334,24 @@ def write_routes(routes_edges: dict, file="data/output.rou.xml") -> None:
 
 
 def get_ttt(file="data/stats.xml"):
-    tree = ET.parse(file)
-    root = tree.getroot()
+    """
+    Get total travel time from the stats file.
 
-    vehicle_trip_stats = root.find("vehicleTripStatistics")
-    total_travel_time = float(vehicle_trip_stats.get("totalTravelTime"))
-    return total_travel_time
+    :param file: Path to the stats file
+    :return: Total travel time in hours.
+    """
+    with open(file, "rb") as f:
+        root = ET.parse(f).getroot()
+    return float(root.find("vehicleTripStatistics").get("totalTravelTime")) / (60**2)
 
 
-def travel_times(file="data/tripinfo.xml"):
+def get_individual_travel_times(file="data/tripinfo.xml") -> dict:
+    """
+    Get individual travel times from the tripinfo file.
+
+    :param file: Path to the tripinfo file
+    :return: Individual travel times for each trip_id.
+    """
     # Parse the XML data
     tree = ET.parse(file)
     root = tree.getroot()
@@ -399,7 +417,13 @@ def calculate_route_cost(actions, weights):
     return costs_r
 
 
-def emissions_func(file_path="data/emissions_per_vehicle.txt"):
+def emissions_func(file_path="data/emissions_per_vehicle.txt") -> dict:
+    """
+    Calculate emissions per vehicle after SUMO simulation.
+
+    :param file_path: Path to the emissions file
+    :return: Emissions per vehicle.
+    """
     vehicle_emission = {}
 
     # Read the TXT file
@@ -498,15 +522,31 @@ def prob_calc(costs, theta=-0.01):
     return probs
 
 
-def normalise_dict(d):
-    min_v, max_v = min(d.values()), max(d.values())
+def normalise_dict(dict_to_normalise: dict) -> dict:
+    """
+    Normalise the values in the dictionary.
+
+    :param dict_to_normalise: Dictionary for which the values will be normalised.
+    :return: Normalised dictionary.
+    """
+    min_v, max_v = min(dict_to_normalise.values()), max(dict_to_normalise.values())
     return {
-        k: (v - min_v) / (max_v - min_v) if max_v != min_v else 0 for k, v in d.items()
+        k: (v - min_v) / (max_v - min_v) if max_v != min_v else 0
+        for k, v in dict_to_normalise.items()
     }
 
 
-def normalise_scalar(min, max, val):
-    return (val - min) / (max - min)
+def normalise_scalar(min_val: float, max_val: float, val: float) -> float:
+    """
+    Normalise a given scalar value.
+
+    :param min_val: Minimum scalar value.
+    :param max_val: Maximum scalar value.
+    :param val: Scalar value to normalise.
+
+    :return: Normalised scalar value.
+    """
+    return (val - min_val) / (max_val - min_val)
 
 
 def running_average(data, window_size):
@@ -538,14 +578,8 @@ def main_incentives():
     # Setting parameters for budget
     total_budget = config["total_budget"]
 
-    # Path for output_rou_alt
-    output_rou_alt_path = config["output_rou_alt_path"]
-    # Path for output_rou
-    routes_file_path = config["output_rou_path"]
-    # Path for edge data frequency
-    edge_data_path = config["edge_data_path"]
-    log_path = config["log_path"]
-    emissions_path = config["emissions_path"]
+    # Paths for all relevant files
+    paths_dict = config["paths_dict"]
 
     # Frequency of the edge data
     edge_data_frequency = config["edge_data_frequency"]
@@ -554,7 +588,7 @@ def main_incentives():
     sumo_params = config["sumo_config"]
 
     # Getting available actions based on pre-computed routes
-    actions_and_costs = get_actions(file_path=output_rou_alt_path)
+    actions_and_costs = get_actions(file_path=paths_dict["output_rou_alt_path"])
 
     # Unpack all the trip IDs for future use
     trips_id = list(actions_and_costs.keys())
@@ -579,10 +613,7 @@ def main_incentives():
         ttt, ind_travel_times, emissions, tot_emission = step(
             edge_data_frequency=edge_data_frequency,
             routes_edges=routes_edges,
-            routes_file_path=routes_file_path,
-            edge_data_path=edge_data_path,
-            log_path=log_path,
-            emissions_path=emissions_path,
+            paths_dict=paths_dict,
             sumo_params=sumo_params,
         )
 
