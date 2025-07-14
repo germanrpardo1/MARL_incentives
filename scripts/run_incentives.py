@@ -15,27 +15,27 @@ from co2Emissions.xmlreader import co2_main
 
 
 def eps_greedy_policy_no_incentives(
-    q: dict, actions_costs: dict, epsilon: float = 0.1
+    q: Array, actions_costs: tuple[list, list], num_routes: int, epsilon: float = 0.1
 ) -> tuple[list, int]:
     """
     Epsilon-greedy policy for selecting a route without incentives.
 
     :param q: Q-values corresponding to a given trip_id
     :param actions_costs: Routes and costs corresponding to a given trip_id
+    :param num_routes: Number of routes available
     :param epsilon: Probability of choosing a random action
 
     :return: (route_edges, selected_action, action_index)
     """
     # Unpack routes and costs
-    routes, costs = actions_costs
-    num_routes = len(costs)
+    routes, _ = actions_costs
 
     # Define random generator
     rng = np.random.default_rng()
-
     # Perform random action with probability epsilon
     if rng.random() <= epsilon:
-        route_idx = int(rng.integers(num_routes))
+        random_int = rng.integers(num_routes)
+        route_idx = int(random_int)  # Random action index
     # Perform action with maximum Q-value with probability 1 - epsilon
     else:
         route_idx = np.argmin(q)
@@ -351,10 +351,10 @@ def get_individual_travel_times(file="data/tripinfo.xml") -> dict:
     # Initialize an empty dictionary to store id and duration
     trip_durations = {}
 
-    # Iterate through each tripinfo element
-    for tripinfo in root.findall("tripinfo"):
-        trip_id = tripinfo.get("id")
-        duration = tripinfo.get("duration")
+    # Iterate through each trip_info element
+    for trip_info in root.findall("tripinfo"):
+        trip_id = trip_info.get("id")
+        duration = trip_info.get("duration")
         if trip_id and duration:
             trip_durations[trip_id] = float(duration)
     return trip_durations
@@ -444,12 +444,27 @@ def calculate_emissions_per_vehicle(file_path="data/emissions_per_vehicle.txt") 
     return vehicle_emission
 
 
+def initialise_q_function_no_incentives(actions_costs: dict) -> dict:
+    """
+    Initialise the Q-function.
+
+    :param actions_costs: Dictionary that stores the possible routes for each
+        trip and their cost.
+
+    :return: initialised Q-function for every trip.
+    """
+    return {
+        trip: np.zeros((len(action_cost[0])))
+        for trip, action_cost in actions_costs.items()
+    }
+
+
 def initialise_q_function_incentives(actions_costs: dict) -> dict:
     """
     Initialise the Q-function.
 
     :param actions_costs: Dictionary that stores the possible routes for each
-        trip and their cost
+        trip and their cost.
 
     :return: initialised Q-function for every trip.
     """
@@ -457,6 +472,40 @@ def initialise_q_function_incentives(actions_costs: dict) -> dict:
         trip: np.zeros((len(action_cost[0]) + 1))
         for trip, action_cost in actions_costs.items()
     }
+
+
+def policy_no_incentives(
+    trips_id: list, q: dict, actions_costs: dict, epsilon: float
+) -> tuple[dict, dict]:
+    """
+    Policy function for the RL algorithm using epsilon-greedy strategy
+        for when no incentives are applied.
+
+    :param trips_id: List of trip IDs
+    :param q: Q-function mapping trip_id to Q-value array
+    :param actions_costs: Dictionary mapping trip_id to (routes, costs)
+    :param epsilon: Probability of choosing a random action
+
+    :return: Tuple containing:
+             - route_edges: mapping trip_id to selected route edges
+             - actions_index: mapping trip_id to selected (route_idx, incentive_level)
+    """
+    route_edges = {}
+    actions_index = {}
+
+    for trip_id in trips_id:
+        _, costs = actions_costs[trip_id]
+        num_routes = len(costs)
+
+        # Select action using epsilon-greedy strategy
+        selected_edges, selected_index = eps_greedy_policy_no_incentives(
+            q[trip_id], actions_costs[trip_id], num_routes, epsilon
+        )
+
+        route_edges[trip_id] = selected_edges
+        actions_index[trip_id] = selected_index
+
+    return route_edges, actions_index
 
 
 def policy_incentives(
@@ -467,7 +516,8 @@ def policy_incentives(
     total_budget: float,
 ) -> tuple[dict, dict]:
     """
-    Policy function for the RL algorithm using epsilon-greedy strategy.
+    Policy function for the RL algorithm using epsilon-greedy strategy
+        for when incentives are applied.
 
     :param trips_id: List of trip IDs
     :param q: Q-function mapping trip_id to Q-value array
@@ -539,6 +589,8 @@ def main_incentives():
     with open("scripts/config.yaml", "r") as file:
         config = yaml.safe_load(file)
 
+    incentives_mode = config["incentives_mode"]
+
     # Number of episodes for the RL algorithm
     episodes = config["episodes"]
 
@@ -575,18 +627,31 @@ def main_incentives():
     emissions_total = []
 
     # Initialise the Q-function
-    q_values = initialise_q_function_incentives(actions_costs=actions_and_costs)
+    if incentives_mode:
+        q_values = initialise_q_function_incentives(actions_costs=actions_and_costs)
+    else:
+        q_values = initialise_q_function_no_incentives(actions_costs=actions_and_costs)
+
     ## vehicle_id -> [(index, edges), costs]
     # Start training the agent
     for _ in range(episodes):
-        # Policy function decides the next actions to take
-        routes_edges, actions_index = policy_incentives(
-            trips_id=trips_id,
-            q=q_values,
-            actions_costs=actions_and_costs,
-            epsilon=epsilon,
-            total_budget=total_budget,
-        )
+        if incentives_mode:
+            # Policy function decides the next actions to take
+            routes_edges, actions_index = policy_incentives(
+                trips_id=trips_id,
+                q=q_values,
+                actions_costs=actions_and_costs,
+                epsilon=epsilon,
+                total_budget=total_budget,
+            )
+        else:
+            # Policy function decides the next actions to take
+            routes_edges, actions_index = policy_no_incentives(
+                trips_id=trips_id,
+                q=q_values,
+                actions_costs=actions_and_costs,
+                epsilon=epsilon,
+            )
 
         # Run a simulation to evaluate the actions selected
         (

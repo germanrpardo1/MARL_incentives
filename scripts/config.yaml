@@ -1,3 +1,31 @@
+# Number of training episodes for the RL agent
+episodes: 2
+
+### Weights for different components of the reward/cost function
+# Weight for Total Travel Time (TTT) of the network
+TTT_weight: 0
+# Weight for individual travel time of each agent
+individual_travel_time_weight: 0.5
+# Weight for minimising individual emissions
+emissions_weight: 0
+# Total emissions weight
+total_emissions_weight: 0
+
+# Number of incentives options
+n_incentives: 2
+
+# Exploration rate for epsilon-greedy policy
+epsilon: 0.9
+# Epsilon decay rate per episode (to reduce exploration over time)
+decay: 0.996
+# Learning rate (α) for Q-learning or other value update algorithms
+alpha: 0.1
+# Total available budget for incentives or policies (can be used as a constraint)
+total_budget: 100
+# Whether to use incentives or not
+incentives_mode: true
+
+# Store all the paths
 paths_dict:
   # Path of output.rou.alt file
   output_rou_alt_path: "data/output.rou.alt.xml"
@@ -24,36 +52,6 @@ sumo_config:
   edges_weights_path: "data/weights.xml"
   edge_frequency_path: "edge_data.add.xml"
 
-# Random seed
-seed: 52
-
 # Edge data frequency
 edge_data_frequency: 500
-
-# Number of training episodes for the RL agent
-episodes: 1
-
-### Weights for different components of the reward/cost function
-# Weight for Total Travel Time (TTT) of the network
-TTT_weight: 0
-# Weight for individual travel time of each agent
-individual_travel_time_weight: 0.5
-# Weight for minimising individual emissions
-emissions_weight: 0
-# Total emissions weight
-total_emissions_weight: 0
-
-# Number of incentives options
-n_incentives: 2
-
-# Exploration rate for epsilon-greedy policy
-epsilon: 0.9
-# Epsilon decay rate per episode (to reduce exploration over time)
-decay: 0.996
-# Learning rate (α) for Q-learning or other value update algorithms
-alpha: 0.1
-# Total available budget for incentives or policies (can be used as a constraint)
-total_budget: 100
-# Whether to use incentives or not
-incentives_mode: true
 
