@@ -585,7 +585,11 @@ def normalise_scalar(min_val: float, max_val: float, val: float) -> float:
     return (val - min_val) / (max_val - min_val)
 
 
-def main_incentives():
+def main_incentives() -> None:
+    """
+    Run the MARL algorithm with or without incentives
+        depending on the incentives_mode parameter.
+    """
     with open("scripts/config.yaml", "r") as file:
         config = yaml.safe_load(file)
 
