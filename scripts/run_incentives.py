@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+from typing import Any
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import subprocess
@@ -585,115 +586,150 @@ def normalise_scalar(min_val: float, max_val: float, val: float) -> float:
     return (val - min_val) / (max_val - min_val)
 
 
-def main_incentives() -> None:
+def compute_reward(
+    trip: str,
+    ind_tt: dict,
+    ind_em: dict,
+    total_tt: float,
+    total_em: float,
+    weights: dict,
+) -> float:
+    """
+    Compute the multi-objective reward.
+
+    :param trip: Trip ID.
+    :param ind_tt: Individual travel times.
+    :param ind_em: Individual emissions.
+    :param total_tt: Total travel time.
+    :param total_em: Total emissions.
+    :param weights: Weight of incentives.
+    :return: Multi-objective reward.
+    """
+    return (
+        weights["individual_tt"] * ind_tt[trip]
+        + weights["ttt"] * total_tt
+        + weights["individual_emissions"] * ind_em[trip]
+        + weights["total_emissions"] * total_em
+    )
+
+
+def select_policy(incentives_mode: bool, **kwargs: Any) -> tuple[dict, dict]:
+    """
+    Select the policy based on whether incentives are applied or not.
+
+    :param incentives_mode: True if incentives are used, False otherwise.
+    :param kwargs: Keyword arguments passed to policy function.
+    :return: Policy function.
+    """
+    if incentives_mode:
+        return policy_incentives(**kwargs)
+    else:
+        # Remove total_budget if it exists (safe removal)
+        kwargs.pop("total_budget", None)
+        return policy_no_incentives(**kwargs)
+
+
+def load_config(path: str = "scripts/config.yaml") -> dict:
+    """
+    Load configuration file.
+
+    :param path: Path to configuration file.
+    :return: Configuration dictionary.
+    """
+    with open(path, "r") as file:
+        return yaml.safe_load(file)
+
+
+def main() -> None:
     """
     Run the MARL algorithm with or without incentives
-        depending on the incentives_mode parameter.
+    depending on the incentives_mode parameter.
     """
-    with open("scripts/config.yaml", "r") as file:
-        config = yaml.safe_load(file)
-
+    # Load config
+    config = load_config(path="scripts/config.yaml")
     incentives_mode = config["incentives_mode"]
-
-    # Number of episodes for the RL algorithm
     episodes = config["episodes"]
 
-    # Setting weights of the objective function
-    ttt_weight = config["TTT_weight"]
-    individual_travel_time_weight = config["individual_travel_time_weight"]
-    individual_emissions_weight = config["emissions_weight"]
-    total_emissions_weight = config["total_emissions_weight"]
+    # Weights of the objective function
+    weights = {
+        "ttt": config["TTT_weight"],
+        "individual_tt": config["individual_travel_time_weight"],
+        "individual_emissions": config["emissions_weight"],
+        "total_emissions": config["total_emissions_weight"],
+    }
 
     # RL hyper-parameters
-    epsilon = config["epsilon"]
-    decay = config["decay"]
-    alpha = config["alpha"]
+    hyperparams = {
+        "epsilon": config["epsilon"],
+        "decay": config["decay"],
+        "alpha": config["alpha"],
+    }
 
-    # Setting parameters for budget
+    # Total budget for the incentives
     total_budget = config["total_budget"]
-
-    # Paths for all relevant files
+    # Dictionary with all paths
     paths_dict = config["paths_dict"]
-
-    # Frequency of the edge data
+    # Define edge data granularity
     edge_data_frequency = config["edge_data_frequency"]
-
     # Parameters to run SUMO
     sumo_params = config["sumo_config"]
 
-    # Getting available actions based on pre-computed routes
+    # Get available actions based on pre-computed routes
     actions_and_costs = get_actions(file_path=paths_dict["output_rou_alt_path"])
-
-    # Unpack all the trip IDs for future use
+    # Unpack trips IDs
     trips_id = list(actions_and_costs.keys())
 
     ttts = []
     emissions_total = []
 
     # Initialise the Q-function
-    if incentives_mode:
-        q_values = initialise_q_function_incentives(actions_costs=actions_and_costs)
-    else:
-        q_values = initialise_q_function_no_incentives(actions_costs=actions_and_costs)
+    q_values = (
+        initialise_q_function_incentives(actions_costs=actions_and_costs)
+        if incentives_mode
+        else initialise_q_function_no_incentives(actions_costs=actions_and_costs)
+    )
 
-    ## vehicle_id -> [(index, edges), costs]
-    # Start training the agent
+    # Train the RL agent
     for _ in range(episodes):
-        if incentives_mode:
-            # Policy function decides the next actions to take
-            routes_edges, actions_index = policy_incentives(
-                trips_id=trips_id,
-                q=q_values,
-                actions_costs=actions_and_costs,
-                epsilon=epsilon,
-                total_budget=total_budget,
-            )
-        else:
-            # Policy function decides the next actions to take
-            routes_edges, actions_index = policy_no_incentives(
-                trips_id=trips_id,
-                q=q_values,
-                actions_costs=actions_and_costs,
-                epsilon=epsilon,
-            )
-
-        # Run a simulation to evaluate the actions selected
-        (
-            total_travel_time,
-            individual_travel_times,
-            individual_emissions,
-            tot_emission,
-        ) = step(
+        # Select policy function based on whether incentives are used or not
+        # Get actions from policy
+        routes_edges, actions_index = select_policy(
+            incentives_mode=incentives_mode,
+            trips_id=trips_id,
+            q=q_values,
+            actions_costs=actions_and_costs,
+            epsilon=hyperparams["epsilon"],
+            total_budget=total_budget,
+        )
+        # Perform actions given by policy
+        total_tt, ind_tt, ind_em, total_em = step(
             edge_data_frequency=edge_data_frequency,
             routes_edges=routes_edges,
             paths_dict=paths_dict,
             sumo_params=sumo_params,
         )
 
-        ttts.append(total_travel_time)
-        emissions_total.append(tot_emission * 30 + 300)
+        ttts.append(total_tt)
+        emissions_total.append(total_em * 30 + 300)
 
         # For each agent update Q function
-        # Q(a) = Q(a) + alpha * (r - Q(a))
+        # Q(a) = (1 - alpha) * Q(a) + alpha * r
         for trip in trips_id:
-            index = actions_index[trip]
-
+            idx = actions_index[trip]
             # Compute reward
-            reward = (
-                individual_travel_time_weight * individual_travel_times[trip]
-                + ttt_weight * total_travel_time
-                + individual_emissions_weight * individual_emissions[trip]
-                + total_emissions_weight * tot_emission
-            )
-
+            reward = compute_reward(trip, ind_tt, ind_em, total_tt, total_em, weights)
             # Update Q-value
-            q_values[trip][index] = (1 - alpha) * q_values[trip][index] + alpha * reward
+            q_values[trip][idx] = (1 - hyperparams["alpha"]) * q_values[trip][
+                idx
+            ] + hyperparams["alpha"] * reward
 
-        epsilon = max(0.01, epsilon * decay)
-
+        hyperparams["epsilon"] = max(
+            0.01, hyperparams["epsilon"] * hyperparams["decay"]
+        )
         # Retrieve updated route costs
         # costs = calculate_route_cost(actions, parse_weights("data/weights.xml"))
 
 
+# TODO(German): look at reward - only normalising some and TTT no
 if __name__ == "__main__":
-    main_incentives()
+    main()
