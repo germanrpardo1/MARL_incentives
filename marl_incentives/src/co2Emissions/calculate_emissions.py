@@ -20,7 +20,7 @@ def co2_main(path):
 
     for timestep in root.findall(".//timestep"):
         subtotal_emission = 0  # reset the instantaneous emissions
-        for vehicle in timestep.findall(".//vehicle"):  # Get the vehicles informations
+        for vehicle in timestep.findall(".//vehicle"):  # Get the vehicles information
             type_passenger = "light_passenger"  # comment this one if you have the vehicle type in the xml file
             fuel = (
                 "gasoline"  # comment this one if you have the fuel type in the xml file
