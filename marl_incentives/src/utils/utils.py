@@ -72,8 +72,6 @@ def write_sumo_config(
     config_path: str,
     network_path: str,
     routes_path: str,
-    edges_weights_path: str,
-    edge_frequency_path: str,
 ) -> None:
     """
     Write SUMO configuration file.
@@ -81,9 +79,12 @@ def write_sumo_config(
     :param config_path: Path to the configuration file.
     :param network_path: Path to the network file.
     :param routes_path: Path to the routes file.
-    :param edges_weights_path: Path to the edges weights file.
-    :param edge_frequency_path: Path to the edge frequency file.
     """
+    # This is the directory your script is in
+    script_dir = Path(__file__).resolve().parent
+    # TODO(German): Fix
+    # Navigate up to the project root and into 'data'
+    data_path = script_dir.parent.parent.parent / "data" / "edge_data.add.xml"
     sumo_cmd = [
         "sumo",
         "-n",
@@ -93,14 +94,14 @@ def write_sumo_config(
         "--save-configuration",
         config_path,
         "--edgedata-output",
-        str(edges_weights_path),
+        data_path,
         "--tripinfo-output",
         str(Path("data") / "tripinfo.xml"),
         "--log",
         str(Path("data") / "log.xml"),
         "--no-step-log",
         "--additional-files",
-        edge_frequency_path,
+        data_path,
         "--begin",
         "0",
         "--route-steps",
@@ -127,11 +128,12 @@ def write_sumo_config(
     subprocess.call(sumo_cmd, stdout=subprocess.PIPE)
 
 
-def write_edge_data_config(filename: str, freq: int) -> None:
+def write_edge_data_config(filename: str, weights_path: str, freq: int) -> None:
     """
     Write config for edge data granularity.
 
     :param filename: Path to the output file.
+    :param weights_path: Path to the weights file.
     :param freq: Edge data granularity.
     """
     # Create the root element
@@ -144,6 +146,7 @@ def write_edge_data_config(filename: str, freq: int) -> None:
         {
             "id": "edge_data",
             "freq": str(freq),
+            "file": weights_path,
             "excludeEmpty": "True",
             "minSamples": "1",
         },

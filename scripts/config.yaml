@@ -23,7 +23,7 @@ alpha: 0.1
 # Total available budget for incentives or policies (can be used as a constraint)
 total_budget: 100
 # Whether to use incentives or not
-incentives_mode: true
+incentives_mode: false
 
 # Store all the paths
 paths_dict:
@@ -49,8 +49,8 @@ sumo_config:
   config_path: "data/config.sumocfg"
   network_path: "data/kamppi.net.xml"
   routes_path: "data/output.rou.xml"
-  edges_weights_path: "data/weights.xml"
-  edge_frequency_path: "edge_data.add.xml"
+  edges_weights_path: "weights.xml"
+  edge_frequency_path: "../edge_data.add.xml"
 
 # Edge data frequency
 edge_data_frequency: 500

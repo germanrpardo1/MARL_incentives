@@ -108,7 +108,11 @@ def step(
     """
     # Write input and configuration files
     ut.write_routes(routes_edges, paths_dict["routes_file_path"])
-    ut.write_edge_data_config(paths_dict["edge_data_path"], edge_data_frequency)
+    ut.write_edge_data_config(
+        paths_dict["edge_data_path"],
+        sumo_params["edges_weights_path"],
+        edge_data_frequency,
+    )
     ut.write_sumo_config(**sumo_params)
 
     # Run SUMO simulation
