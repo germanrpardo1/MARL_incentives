@@ -23,7 +23,7 @@ alpha: 0.1
 # Total available budget for incentives or policies (can be used as a constraint)
 total_budget: 100
 # Whether to use incentives or not
-incentives_mode: false
+incentives_mode: true
 
 # Store all the paths
 paths_dict:

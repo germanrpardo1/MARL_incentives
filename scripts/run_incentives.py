@@ -1,18 +1,17 @@
-"""This script runs the incentives MARL algorithm."""
+"""This script runs the MARL algorithm with and without incentives."""
 
 import sys
-from pathlib import Path
 
 import numpy as np
 from typing import Any
 import xml.etree.ElementTree as ET
-from xml.dom import minidom
+
 import subprocess
 import sumolib
-import yaml
+from utils import utils as ut
 from cfgv import Array
 
-from co2Emissions.xmlreader import co2_main
+import co2Emissions.calculate_emissions as em
 
 
 def eps_greedy_policy_no_incentives(
@@ -108,23 +107,23 @@ def step(
                       normalised individual emissions, normalised total emissions)
     """
     # Write input and configuration files
-    write_routes(routes_edges, paths_dict["routes_file_path"])
-    write_edge_data_config(paths_dict["edge_data_path"], edge_data_frequency)
-    write_sumo_config(**sumo_params)
+    ut.write_routes(routes_edges, paths_dict["routes_file_path"])
+    ut.write_edge_data_config(paths_dict["edge_data_path"], edge_data_frequency)
+    ut.write_sumo_config(**sumo_params)
 
     # Run SUMO simulation
     run_simulation(paths_dict["log_path"], sumo_params["config_path"])
 
     # Process outputs
-    total_tt = get_ttt(paths_dict["stats_path"])
-    individual_tt = normalise_dict(
-        get_individual_travel_times(paths_dict["trip_info_path"])
+    total_tt = ut.get_ttt(paths_dict["stats_path"])
+    individual_tt = ut.normalise_dict(
+        ut.get_individual_travel_times(paths_dict["trip_info_path"])
     )
-    individual_emissions = normalise_dict(
-        calculate_emissions_per_vehicle(paths_dict["emissions_per_vehicle_path"])
+    individual_emissions = ut.normalise_dict(
+        em.calculate_emissions_per_vehicle(paths_dict["emissions_per_vehicle_path"])
     )
-    total_emissions = normalise_scalar(
-        min_val=300, max_val=330, val=co2_main(paths_dict["emissions_path"]) / 1000
+    total_emissions = ut.normalise_scalar(
+        min_val=300, max_val=330, val=em.co2_main(paths_dict["emissions_path"]) / 1000
     )
 
     return total_tt, individual_tt, individual_emissions, total_emissions
@@ -187,180 +186,6 @@ def run_simulation(log_path: str, sumo_config_path: str) -> None:
     subprocess.call(sumo_cmd, stdout=log, stderr=log)
 
 
-def write_sumo_config(
-    config_path: str,
-    network_path: str,
-    routes_path: str,
-    edges_weights_path: str,
-    edge_frequency_path: str,
-) -> None:
-    """
-    Write SUMO configuration file.
-
-    :param config_path: Path to the configuration file.
-    :param network_path: Path to the network file.
-    :param routes_path: Path to the routes file.
-    :param edges_weights_path: Path to the edges weights file.
-    :param edge_frequency_path: Path to the edge frequency file.
-    """
-    sumo_cmd = [
-        "sumo",
-        "-n",
-        network_path,
-        "-r",
-        routes_path,
-        "--save-configuration",
-        config_path,
-        "--edgedata-output",
-        str(edges_weights_path),
-        "--tripinfo-output",
-        str(Path("data") / "tripinfo.xml"),
-        "--log",
-        str(Path("data") / "log.xml"),
-        "--no-step-log",
-        "--additional-files",
-        edge_frequency_path,
-        "--begin",
-        "0",
-        "--route-steps",
-        "200",
-        "--time-to-teleport",
-        "300",
-        "--time-to-teleport.highways",
-        "0",
-        "--no-internal-links",
-        "False",
-        "--eager-insert",
-        "False",
-        "--verbose",
-        "True",
-        "--no-warnings",
-        "True",
-        "--statistic-output",
-        str(Path("data") / "stats.xml"),
-        "--fcd-output",
-        str(Path("data") / "fcd.xml"),
-        "--fcd-output.acceleration",
-    ]
-
-    subprocess.call(sumo_cmd, stdout=subprocess.PIPE)
-
-
-def write_edge_data_config(filename: str, freq: int) -> None:
-    """
-    Write config for edge data granularity.
-
-    :param filename: Path to the output file.
-    :param freq: Edge data granularity.
-    """
-    # Create the root element
-    root = ET.Element("a")
-
-    # edgeData element
-    ET.SubElement(
-        root,
-        "edgeData",
-        {
-            "id": "edge_data",
-            "freq": str(freq),
-            "excludeEmpty": "True",
-            "minSamples": "1",
-        },
-    )
-    # Create the XML tree
-    ET.ElementTree(root)
-    # Convert to string
-    xml_str = ET.tostring(root, encoding="unicode")
-    # Parse the string with minidom for pretty printing
-    pretty_xml_str = minidom.parseString(xml_str).toprettyxml(indent="    ")
-    # Write to file
-    with open(filename, "w", encoding="utf-8") as file:
-        file.write(pretty_xml_str)
-
-
-def write_routes(routes_edges: dict, file: str = "data/output.rou.xml") -> None:
-    """
-    Write all the routes to a .XML file.
-
-    :param routes_edges: Dictionary containing all the edges for every trip
-    :param file: Path to the output file
-    """
-    # Create the root element
-    routes_element = ET.Element("routes")
-    routes_element.set("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance")
-    routes_element.set(
-        "xsi:noNamespaceSchemaLocation", "http://sumo.dlr.de/xsd/routes_file.xsd"
-    )
-
-    # Add the vType element
-    vtype_element = ET.SubElement(routes_element, "vType")
-    vtype_element.set("id", "type1")
-    vtype_element.set("length", "5.00")
-    vtype_element.set("maxSpeed", "40.00")
-    vtype_element.set("accel", "0.4")
-    vtype_element.set("decel", "4.8")
-    vtype_element.set("sigma", "0.5")
-
-    # Add vehicles and their routes to the XML
-    counter = 0
-    for vehicle_id, edges in routes_edges.items():
-        vehicle_element = ET.SubElement(routes_element, "vehicle")
-        vehicle_element.set("id", vehicle_id)
-        vehicle_element.set("type", "type1")
-        vehicle_element.set(
-            "depart", str(0.09 * counter)
-        )  # Modify departure time as needed
-
-        route_element = ET.SubElement(vehicle_element, "route")
-        route_element.set("edges", " ".join(edges))
-
-        counter += 1
-    # Convert the ElementTree to a string
-    xml_str = ET.tostring(routes_element, "utf-8")
-
-    # Prettify the XML string
-    pretty_xml_str = minidom.parseString(xml_str).toprettyxml(indent="    ")
-
-    # Write to a .rou.xml file
-    with open(file, "w") as f:
-        f.write(pretty_xml_str)
-
-
-def get_ttt(file="data/stats.xml"):
-    """
-    Get total travel time from the stats file.
-
-    :param file: Path to the stats file
-    :return: Total travel time in hours.
-    """
-    with open(file, "rb") as f:
-        root = ET.parse(f).getroot()
-    return float(root.find("vehicleTripStatistics").get("totalTravelTime")) / (60**2)
-
-
-def get_individual_travel_times(file="data/tripinfo.xml") -> dict:
-    """
-    Get individual travel times from the tripinfo file.
-
-    :param file: Path to the tripinfo file
-    :return: Individual travel times for each trip_id.
-    """
-    # Parse the XML data
-    tree = ET.parse(file)
-    root = tree.getroot()
-
-    # Initialize an empty dictionary to store id and duration
-    trip_durations = {}
-
-    # Iterate through each trip_info element
-    for trip_info in root.findall("tripinfo"):
-        trip_id = trip_info.get("id")
-        duration = trip_info.get("duration")
-        if trip_id and duration:
-            trip_durations[trip_id] = float(duration)
-    return trip_durations
-
-
 def parse_weights(xml_file):
     tree = ET.parse(xml_file)
     root = tree.getroot()
@@ -408,41 +233,6 @@ def calculate_route_cost(actions, weights):
         costs_r[trip] = trip_costs
 
     return costs_r
-
-
-def calculate_emissions_per_vehicle(file_path="data/emissions_per_vehicle.txt") -> dict:
-    """
-    Calculate emissions per vehicle after SUMO simulation.
-
-    :param file_path: Path to the emissions file
-    :return: Emissions per vehicle.
-    """
-    vehicle_emission = {}
-
-    # Read the TXT file
-    with open(file_path, "r") as file:
-        lines = file.readlines()
-
-    # Skip the header and process each line
-    for line in lines[1:]:
-        # Validate line format
-        if ";" in line:
-            parts = line.strip().split(";")
-            if len(parts) == 2:
-                vehicle, emission = parts
-                try:
-                    vehicle_emission[vehicle] = float(emission)
-                except ValueError:
-                    pass
-                    # print(f"Skipping invalid emission value in line: {line.strip()}")
-            else:
-                pass
-                # print(f"Skipping malformed line: {line.strip()}")
-        else:
-            pass
-            # print(f"Skipping malformed line: {line.strip()}")
-
-    return vehicle_emission
 
 
 def initialise_q_function_no_incentives(actions_costs: dict) -> dict:
@@ -559,33 +349,6 @@ def policy_incentives(
     return route_edges, actions_index
 
 
-def normalise_dict(dict_to_normalise: dict) -> dict:
-    """
-    Normalise the values in the dictionary.
-
-    :param dict_to_normalise: Dictionary for which the values will be normalised.
-    :return: Normalised dictionary.
-    """
-    min_v, max_v = min(dict_to_normalise.values()), max(dict_to_normalise.values())
-    return {
-        k: (v - min_v) / (max_v - min_v) if max_v != min_v else 0
-        for k, v in dict_to_normalise.items()
-    }
-
-
-def normalise_scalar(min_val: float, max_val: float, val: float) -> float:
-    """
-    Normalise a given scalar value.
-
-    :param min_val: Minimum scalar value.
-    :param max_val: Maximum scalar value.
-    :param val: Scalar value to normalise.
-
-    :return: Normalised scalar value.
-    """
-    return (val - min_val) / (max_val - min_val)
-
-
 def compute_reward(
     trip: str,
     ind_tt: dict,
@@ -613,7 +376,7 @@ def compute_reward(
     )
 
 
-def select_policy(incentives_mode: bool, **kwargs: Any) -> tuple[dict, dict]:
+def policy_function(incentives_mode: bool, **kwargs: Any) -> tuple[dict, dict]:
     """
     Select the policy based on whether incentives are applied or not.
 
@@ -629,24 +392,13 @@ def select_policy(incentives_mode: bool, **kwargs: Any) -> tuple[dict, dict]:
         return policy_no_incentives(**kwargs)
 
 
-def load_config(path: str = "scripts/config.yaml") -> dict:
-    """
-    Load configuration file.
-
-    :param path: Path to configuration file.
-    :return: Configuration dictionary.
-    """
-    with open(path, "r") as file:
-        return yaml.safe_load(file)
-
-
 def main() -> None:
     """
     Run the MARL algorithm with or without incentives
     depending on the incentives_mode parameter.
     """
     # Load config
-    config = load_config(path="scripts/config.yaml")
+    config = ut.load_config(path="scripts/config.yaml")
     incentives_mode = config["incentives_mode"]
     episodes = config["episodes"]
 
@@ -693,7 +445,7 @@ def main() -> None:
     for _ in range(episodes):
         # Select policy function based on whether incentives are used or not
         # Get actions from policy
-        routes_edges, actions_index = select_policy(
+        routes_edges, actions_index = policy_function(
             incentives_mode=incentives_mode,
             trips_id=trips_id,
             q=q_values,

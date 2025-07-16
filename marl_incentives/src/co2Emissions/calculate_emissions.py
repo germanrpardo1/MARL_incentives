@@ -7,7 +7,6 @@
 # 2- Emissions_per_lane.txt contains the total emissions and the total emissions per lane
 
 import xml.etree.ElementTree as ET
-import os
 from co2Emissions.co2modeler_v1 import co2modeler  # Import the CO2 modeler
 
 
@@ -15,18 +14,13 @@ from co2Emissions.co2modeler_v1 import co2modeler  # Import the CO2 modeler
 def co2_main(path):
     # current_directory = os.path.dirname(__file__)
     xml_file = path  # os.path.join(current_directory, 'fcd.xml') # chagne this file to the dieserd xml file
-    output_file = "emissions_per_second.txt"  # os.path.join(path, 'emissions_per_second.txt')  # this file contains the total emissions and the instantaneous emissions
-    output_file_2 = "emissions_per_lane.txt"  # os.path.join(path, 'emissions_per_lane.txt')  # this file contains the total emissions within each lane
     tree = ET.parse(xml_file)
     root = tree.getroot()
     total_emissions = 0  # reset the variables
-    emission_per_second = []
-    emissions_per_lane = {}
     emissions_per_vehicle = {}
 
     for timestep in root.findall(".//timestep"):
-        subtotal_emission = 0  # resest the instantaneous emissions
-        time = timestep.get("time")  # Get the time step
+        subtotal_emission = 0  # reset the instantaneous emissions
         for vehicle in timestep.findall(".//vehicle"):  # Get the vehicles informations
             # type = (vehicle.get('type'))         # uncomment this one if you have the vehicle type in the xml file
             type = "light_passenger"  # comment this one if you have the vehicle type in the xml file
@@ -84,3 +78,38 @@ def co2_main(path):
             file.write(f"{vehicle};{emission}\n")
 
     return total_emissions
+
+
+def calculate_emissions_per_vehicle(file_path="data/emissions_per_vehicle.txt") -> dict:
+    """
+    Calculate emissions per vehicle after SUMO simulation.
+
+    :param file_path: Path to the emissions file
+    :return: Emissions per vehicle.
+    """
+    vehicle_emission = {}
+
+    # Read the TXT file
+    with open(file_path, "r") as file:
+        lines = file.readlines()
+
+    # Skip the header and process each line
+    for line in lines[1:]:
+        # Validate line format
+        if ";" in line:
+            parts = line.strip().split(";")
+            if len(parts) == 2:
+                vehicle, emission = parts
+                try:
+                    vehicle_emission[vehicle] = float(emission)
+                except ValueError:
+                    pass
+                    # print(f"Skipping invalid emission value in line: {line.strip()}")
+            else:
+                pass
+                # print(f"Skipping malformed line: {line.strip()}")
+        else:
+            pass
+            # print(f"Skipping malformed line: {line.strip()}")
+
+    return vehicle_emission
