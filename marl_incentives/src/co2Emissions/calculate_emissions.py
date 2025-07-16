@@ -12,8 +12,7 @@ from co2Emissions.co2modeler_v1 import co2modeler  # Import the CO2 modeler
 
 # if __name__ == "__main__":
 def co2_main(path):
-    # current_directory = os.path.dirname(__file__)
-    xml_file = path  # os.path.join(current_directory, 'fcd.xml') # chagne this file to the dieserd xml file
+    xml_file = path  # os.path.join(current_directory, 'fcd.xml') # change this file to the desired xml file
     tree = ET.parse(xml_file)
     root = tree.getroot()
     total_emissions = 0  # reset the variables
@@ -22,9 +21,7 @@ def co2_main(path):
     for timestep in root.findall(".//timestep"):
         subtotal_emission = 0  # reset the instantaneous emissions
         for vehicle in timestep.findall(".//vehicle"):  # Get the vehicles informations
-            # type = (vehicle.get('type'))         # uncomment this one if you have the vehicle type in the xml file
-            type = "light_passenger"  # comment this one if you have the vehicle type in the xml file
-            # fuel = (vehicle.get('fuel'))         # uncomment this one if you have the fuel type in the xml file
+            type_passenger = "light_passenger"  # comment this one if you have the vehicle type in the xml file
             fuel = (
                 "gasoline"  # comment this one if you have the fuel type in the xml file
             )
@@ -33,7 +30,7 @@ def co2_main(path):
                 vehicle.get("acceleration")
             )  # Get the vehicles acceleration
             emission = float(
-                co2modeler(speed, acceleration, type, fuel)
+                co2modeler(speed, acceleration, type_passenger, fuel)
             )  # Calculate the emissions assuming gasoline passenger vehicle
 
             if (
@@ -84,12 +81,5 @@ def calculate_emissions_per_vehicle(file_path="data/emissions_per_vehicle.txt") 
                     vehicle_emission[vehicle] = float(emission)
                 except ValueError:
                     pass
-                    # print(f"Skipping invalid emission value in line: {line.strip()}")
-            else:
-                pass
-                # print(f"Skipping malformed line: {line.strip()}")
-        else:
-            pass
-            # print(f"Skipping malformed line: {line.strip()}")
 
     return vehicle_emission
