@@ -41,11 +41,6 @@ def co2_main(path):
             ):  # Create key for each lane
                 emissions_per_vehicle[vehicle.get("id")] = 0
             emissions_per_vehicle[vehicle.get("id")] += emission
-            # lane = vehicle.get('lane')  # Get the lane
-            # if lane not in emissions_per_lane: # Create key for each lane
-            #    emissions_per_lane[lane] = 0
-
-            # emissions_per_lane[lane] += emission # Sort emissions per lane
 
             subtotal_emission += (
                 emission  # Add the emissions to the instantaneous emissions
@@ -54,21 +49,6 @@ def co2_main(path):
         total_emissions += (
             subtotal_emission  # Add the instantaneous emissions to the total emissions
         )
-        # emission_per_second.append((time,subtotal_emission))
-
-    # Write the instantaneous emissions
-    # with open(output_file,'w') as file:
-    #    file.write(f"Total emissions: {total_emissions}\n \n")
-    #    file.write("time(s); Emission \n")
-    #    for time,emission in emission_per_second:
-    #        file.write(f"{time};{emission}\n")
-
-    # Write the emissions per lane
-    # with open(output_file_2,'w') as file:
-    #    file.write(f"Total emissions: {total_emissions}\n \n")
-    #    file.write("lane; Emission \n")
-    #    for lane,emission in emissions_per_lane.items():
-    #        file.write(f"{lane};{emission}\n")
 
     # Write the vehicle emissions
     with open("emissions_per_vehicle.txt", "w") as file:
