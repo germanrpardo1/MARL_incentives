@@ -8,3 +8,4 @@
 *.alt
 *data
 *.idea
+*ipynb_checkpoints
