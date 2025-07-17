@@ -7,6 +7,7 @@
 # 2- Emissions_per_lane.txt contains the total emissions and the total emissions per lane
 
 import xml.etree.ElementTree as ET
+
 from co2Emissions.co2modeler_v1 import co2modeler  # Import the CO2 modeler
 
 

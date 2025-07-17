@@ -1,10 +1,11 @@
 """This module provides general useful functions"""
 
-import yaml
-import xml.etree.ElementTree as ET
-from xml.dom import minidom
-from pathlib import Path
 import subprocess
+import xml.etree.ElementTree as ET
+from pathlib import Path
+from xml.dom import minidom
+
+import yaml
 
 
 def load_config(path: str = "scripts/config.yaml") -> dict:
