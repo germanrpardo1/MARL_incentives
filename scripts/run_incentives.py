@@ -116,6 +116,7 @@ def main() -> None:
             actions_costs=actions_and_costs,
             epsilon=hyperparams["epsilon"],
             total_budget=total_budget,
+            strategy=config["strategy"],
         )
         # Perform actions given by policy
         total_tt, ind_tt, ind_em, total_em = env.step(

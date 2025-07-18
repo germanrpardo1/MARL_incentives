@@ -6,6 +6,9 @@ from typing import Any
 import numpy as np
 from cfgv import Array
 
+# Initialise a random generator instance
+_rng = np.random.default_rng()
+
 
 def get_actions(file_path: str) -> dict:
     """
@@ -61,11 +64,9 @@ def eps_greedy_policy_no_incentives(
     # Unpack routes and costs
     routes, _ = actions_costs
 
-    # Define random generator
-    rng = np.random.default_rng()
     # Perform random action with probability epsilon
-    if rng.random() <= epsilon:
-        random_int = rng.integers(num_routes)
+    if _rng.random() <= epsilon:
+        random_int = _rng.integers(num_routes)
         route_idx = int(random_int)  # Random action index
     # Perform action with maximum Q-value with probability 1 - epsilon
     else:
@@ -92,11 +93,9 @@ def eps_greedy_policy_incentives(
     # Unpack routes and costs
     routes, costs = actions_costs
 
-    # Define random generator
-    rng = np.random.default_rng()
     # Perform random action with probability epsilon
-    if rng.random() <= epsilon:
-        random_int = rng.integers(num_routes + 1)
+    if _rng.random() <= epsilon:
+        random_int = _rng.integers(num_routes + 1)
         action_index = int(random_int)  # Random action index
     # Perform action with maximum Q-value with probability 1 - epsilon
     else:
@@ -193,8 +192,6 @@ def route_selection_strategy(costs: list, strategy: str = "argmin") -> int:
     :param strategy: Strategy used to select routes.
     :return: Route index.
     """
-    # Initialise a random generator instance
-    _rng = np.random.default_rng()
 
     costs = np.array(costs)
 
@@ -221,6 +218,7 @@ def policy_incentives(
     actions_costs: dict,
     epsilon: float,
     total_budget: float,
+    strategy: str,
 ) -> tuple[dict, dict]:
     """
     Policy function for the RL algorithm using epsilon-greedy strategy
@@ -231,6 +229,7 @@ def policy_incentives(
     :param actions_costs: Dictionary mapping trip_id to (routes, costs)
     :param epsilon: Probability of choosing a random action
     :param total_budget: Maximum total incentive budget
+    :param strategy: Strategy used to select routes.
 
     :return: Tuple containing:
              - route_edges: mapping trip_id to selected route edges
@@ -253,7 +252,7 @@ def policy_incentives(
 
         # If there is no budget left, select route according to route strategy
         if current_budget + incentive > total_budget:
-            selected_action = route_selection_strategy(costs=costs, strategy="argmin")
+            selected_action = route_selection_strategy(costs=costs, strategy=strategy)
             selected_edges = routes[selected_action][1]
             incentive = 0
 
@@ -278,6 +277,7 @@ def policy_function(incentives_mode: bool, **kwargs: Any) -> tuple[dict, dict]:
     else:
         # Remove total_budget if it exists (safe removal)
         kwargs.pop("total_budget", None)
+        kwargs.pop("strategy", None)
         return policy_no_incentives(**kwargs)
 
 
