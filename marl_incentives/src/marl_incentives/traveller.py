@@ -246,3 +246,31 @@ def policy_function(incentives_mode: bool, **kwargs: Any) -> tuple[dict, dict]:
         # Remove total_budget if it exists (safe removal)
         kwargs.pop("total_budget", None)
         return policy_no_incentives(**kwargs)
+
+
+# TODO(German): look at reward - only normalising some and TTT no
+def compute_reward(
+    trip: str,
+    ind_tt: dict,
+    ind_em: dict,
+    total_tt: float,
+    total_em: float,
+    weights: dict,
+) -> float:
+    """
+    Compute the multi-objective reward.
+
+    :param trip: Trip ID.
+    :param ind_tt: Individual travel times.
+    :param ind_em: Individual emissions.
+    :param total_tt: Total travel time.
+    :param total_em: Total emissions.
+    :param weights: Weight of incentives.
+    :return: Multi-objective reward.
+    """
+    return (
+        weights["individual_tt"] * ind_tt[trip]
+        + weights["ttt"] * total_tt
+        + weights["individual_emissions"] * ind_em[trip]
+        + weights["total_emissions"] * total_em
+    )

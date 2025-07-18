@@ -5,7 +5,8 @@ import sys
 
 import co2Emissions.calculate_emissions as em
 import sumolib
-import utils.utils as ut
+from utils import utils as ut
+from utils import xml_manipulation as xmlm
 
 
 def run_simulation(log_path: str, sumo_config_path: str) -> None:
@@ -47,21 +48,21 @@ def step(
                       normalised individual emissions, normalised total emissions)
     """
     # Write input and configuration files
-    ut.write_routes(routes_edges, paths_dict["routes_file_path"])
-    ut.write_edge_data_config(
+    xmlm.write_routes(routes_edges, paths_dict["routes_file_path"])
+    xmlm.write_edge_data_config(
         paths_dict["edge_data_path"],
         paths_dict["edges_weights_path"],
         edge_data_frequency,
     )
-    ut.write_sumo_config(**sumo_params)
+    xmlm.write_sumo_config(**sumo_params)
 
     # Run SUMO simulation
     run_simulation(paths_dict["log_path"], sumo_params["config_path"])
 
     # Process outputs
-    total_tt = ut.get_ttt(paths_dict["stats_path"])
+    total_tt = xmlm.get_ttt(paths_dict["stats_path"])
     individual_tt = ut.normalise_dict(
-        ut.get_individual_travel_times(paths_dict["trip_info_path"])
+        xmlm.get_individual_travel_times(paths_dict["trip_info_path"])
     )
     individual_emissions = ut.normalise_dict(
         em.calculate_emissions_per_vehicle(paths_dict["emissions_per_vehicle_path"])

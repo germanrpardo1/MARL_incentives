@@ -57,37 +57,9 @@ def calculate_route_cost(actions, weights):
     return costs_r
 
 
-def compute_reward(
-    trip: str,
-    ind_tt: dict,
-    ind_em: dict,
-    total_tt: float,
-    total_em: float,
-    weights: dict,
-) -> float:
-    """
-    Compute the multi-objective reward.
-
-    :param trip: Trip ID.
-    :param ind_tt: Individual travel times.
-    :param ind_em: Individual emissions.
-    :param total_tt: Total travel time.
-    :param total_em: Total emissions.
-    :param weights: Weight of incentives.
-    :return: Multi-objective reward.
-    """
-    return (
-        weights["individual_tt"] * ind_tt[trip]
-        + weights["ttt"] * total_tt
-        + weights["individual_emissions"] * ind_em[trip]
-        + weights["total_emissions"] * total_em
-    )
-
-
 def main() -> None:
     """
-    Run the MARL algorithm with or without incentives
-    depending on the incentives_mode parameter.
+    Run the MARL algorithm with or without incentives.
     """
     # Load config
     config = ut.load_config(path="scripts/config.yaml")
@@ -161,7 +133,9 @@ def main() -> None:
         for trip in trips_id:
             idx = actions_index[trip]
             # Compute reward
-            reward = compute_reward(trip, ind_tt, ind_em, total_tt, total_em, weights)
+            reward = tr.compute_reward(
+                trip, ind_tt, ind_em, total_tt, total_em, weights
+            )
             # Update Q-value
             q_values[trip][idx] = (1 - hyperparams["alpha"]) * q_values[trip][
                 idx
@@ -174,6 +148,5 @@ def main() -> None:
         # costs = calculate_route_cost(actions, parse_weights("data/weights.xml"))
 
 
-# TODO(German): look at reward - only normalising some and TTT no
 if __name__ == "__main__":
     main()
