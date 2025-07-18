@@ -112,7 +112,10 @@ def eps_greedy_policy_incentives(
         incentive = 0
 
     # Choose the route with the minimum adjusted cost
-    selected_action = int(np.argmin(adjusted_costs))
+    # Here, the route selection strategy should always be minimum cost
+    # as we assume that travellers take the incentivised route deterministically
+    # when participation rate is added, this will need modification
+    selected_action = route_selection_strategy(costs=adjusted_costs, strategy="argmin")
     route_edges = routes[selected_action][1]
 
     return route_edges, selected_action, action_index, incentive
@@ -182,14 +185,34 @@ def policy_no_incentives(
     return route_edges, actions_index
 
 
-def route_selection_strategy(costs: list) -> int:
+def route_selection_strategy(costs: list, strategy: str = "argmin") -> int:
     """
-    Select the strategy for route selection when there is no budget left
+    Select the strategy for route selection when there is no budget left.
 
-    :param costs: Costs corresponding to all the routes of a give trip_id.
+    :param costs: Costs corresponding to all the routes of a given trip_id.
+    :param strategy: Strategy used to select routes.
     :return: Route index.
     """
-    return int(np.argmin(costs))
+    # Initialise a random generator instance
+    _rng = np.random.default_rng()
+
+    costs = np.array(costs)
+
+    if strategy == "argmin":
+        return int(np.argmin(costs))
+
+    elif strategy == "prob_distribution":
+        probs = costs / np.sum(costs)
+        return int(_rng.choice(len(costs), p=probs))
+
+    elif strategy == "logit":
+        # Inverse utility (lower cost -> higher probability)
+        exp_utilities = np.exp(-costs)
+        probs = exp_utilities / np.sum(exp_utilities)
+        return int(_rng.choice(len(costs), p=probs))
+
+    else:
+        raise ValueError(f"Unknown strategy: {strategy}")
 
 
 def policy_incentives(
@@ -230,7 +253,7 @@ def policy_incentives(
 
         # If there is no budget left, select route according to route strategy
         if current_budget + incentive > total_budget:
-            selected_action = route_selection_strategy(costs=costs)
+            selected_action = route_selection_strategy(costs=costs, strategy="argmin")
             selected_edges = routes[selected_action][1]
             incentive = 0
 
