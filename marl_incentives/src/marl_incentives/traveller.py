@@ -182,6 +182,16 @@ def policy_no_incentives(
     return route_edges, actions_index
 
 
+def route_selection_strategy(costs: list) -> int:
+    """
+    Select the strategy for route selection when there is no budget left
+
+    :param costs: Costs corresponding to all the routes of a give trip_id.
+    :return: Route index.
+    """
+    return int(np.argmin(costs))
+
+
 def policy_incentives(
     trips_id: list,
     q: dict,
@@ -218,9 +228,9 @@ def policy_incentives(
             )
         )
 
-        # Enforce budget constraint
+        # If there is no budget left, select route according to route strategy
         if current_budget + incentive > total_budget:
-            selected_action = int(np.argmin(costs))
+            selected_action = route_selection_strategy(costs=costs)
             selected_edges = routes[selected_action][1]
             incentive = 0
 
