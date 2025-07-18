@@ -105,7 +105,7 @@ def main() -> None:
         else tr.initialise_q_function_no_incentives(actions_costs=actions_and_costs)
     )
 
-    # Train the RL agent
+    # Train RL agent
     for _ in range(episodes):
         # Select policy function based on whether incentives are used or not
         # Get actions from policy
@@ -125,6 +125,7 @@ def main() -> None:
             sumo_params=sumo_params,
         )
 
+        # Record TTT and total emissions throughout iterations
         ttts.append(total_tt)
         emissions_total.append(total_em * 30 + 300)
 
