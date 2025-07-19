@@ -204,7 +204,7 @@ def route_selection_strategy(costs: list, strategy: str = "argmin") -> int:
 
     elif strategy == "logit":
         # Inverse utility (lower cost -> higher probability)
-        exp_utilities = np.exp(-costs)
+        exp_utilities = np.exp(-costs / max(costs))
         probs = exp_utilities / np.sum(exp_utilities)
         return int(_rng.choice(len(costs), p=probs))
 

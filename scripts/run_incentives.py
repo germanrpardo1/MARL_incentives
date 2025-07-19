@@ -6,6 +6,7 @@ from utils import utils as ut
 
 from marl_incentives import environment as env
 from marl_incentives import traveller as tr
+import matplotlib.pyplot as plt
 
 
 def parse_weights(xml_file):
@@ -55,6 +56,18 @@ def calculate_route_cost(actions, weights):
         costs_r[trip] = trip_costs
 
     return costs_r
+
+
+def save_plot_ttt(values: list) -> None:
+    # Plotting the values
+    plt.plot(values, marker="o")
+    plt.title("Total travel time")
+    plt.xlabel("Episodes")
+    plt.ylabel("TTT")
+    plt.grid(True)
+
+    # Save the plot as a PNG file
+    plt.savefig("ttt_plot.png")
 
 
 def main() -> None:
@@ -146,6 +159,9 @@ def main() -> None:
         hyperparams["epsilon"] = max(
             0.01, hyperparams["epsilon"] * hyperparams["decay"]
         )
+        print(_)
+        print(total_tt)
+        save_plot_ttt(ttts)
         # Retrieve updated route costs
         # costs = calculate_route_cost(actions, parse_weights("data/weights.xml"))
 
