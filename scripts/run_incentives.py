@@ -1,9 +1,9 @@
 """This script runs the MARL algorithm with and without incentives."""
 
+import sys
 import xml.etree.ElementTree as ET
 
 import matplotlib.pyplot as plt
-import sys
 from utils import utils as ut
 
 from marl_incentives import environment as env

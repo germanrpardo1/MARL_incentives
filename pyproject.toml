@@ -15,7 +15,6 @@ dependencies = [
     "sphinx>=8.2.3",
     "sphinx-rtd-theme>=3.0.2",
     "sumolib>=1.23.1",
-    "tqdm>=4.67.1",
 ]
 
 [build-system]
