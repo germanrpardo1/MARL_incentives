@@ -1,5 +1,6 @@
 """This script runs the MARL algorithm with and without incentives."""
 
+import pickle
 import sys
 import xml.etree.ElementTree as ET
 
@@ -60,16 +61,50 @@ def calculate_route_cost(actions, weights):
     return costs_r
 
 
-def save_plot_ttt(values: list) -> None:
-    # Plotting the values
-    plt.plot(values, marker="o")
-    plt.title("Total travel time")
-    plt.xlabel("Episodes")
+def save_plot_and_file(
+    values: list,
+    window: int = 30,
+    path_to_pickle: str = "results/pickle_files/ttt/ttt",
+    path_to_plot: str = "results/plots/ttt",
+) -> None:
+    """
+    Save a plot of the moving average and a pickle file of raw values.
+
+    :param values: List of raw values to save.
+    :param window: Window size for moving average.
+    :param path_to_pickle: Path to the pickle file.
+    :param path_to_plot: Path to the plots.
+    """
+    if not values:
+        return
+
+    arr = np.array(values)
+
+    # Compute moving average
+    if len(arr) >= window:
+        smoothed = np.convolve(arr, np.ones(window) / window, mode="valid")
+        x = np.arange(window - 1, len(arr))
+    else:
+        smoothed = []
+        x = []
+
+    # Plot only the moving average
+    plt.figure(figsize=(10, 5))
+    if smoothed:
+        plt.plot(
+            x, smoothed, label=f"Moving Avg ({window})", color="orange", linewidth=2
+        )
+    plt.title("Total Travel Time per Episode")
+    plt.xlabel("Episode")
     plt.ylabel("TTT")
     plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(f"{path_to_plot}_plot.png")
+    plt.close()
 
-    # Save the plot as a PNG file
-    plt.savefig("ttt_plot.png")
+    # Save raw values as pickle
+    with open(f"{path_to_pickle}_values.pkl", "wb") as f:
+        pickle.dump(values, f)
 
 
 def log_progress(
@@ -212,7 +247,9 @@ def main() -> None:
 
         # Retrieve updated route costs
         # costs = calculate_route_cost(actions, parse_weights("data/weights.xml"))
-    save_plot_ttt(ttts)
+
+    # Save the plot and pickle file
+    save_plot_and_file(values=ttts)
 
 
 if __name__ == "__main__":
