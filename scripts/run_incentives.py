@@ -4,6 +4,7 @@ import sys
 import xml.etree.ElementTree as ET
 
 import matplotlib.pyplot as plt
+import numpy as np
 from utils import utils as ut
 
 from marl_incentives import environment as env
@@ -69,6 +70,49 @@ def save_plot_ttt(values: list) -> None:
 
     # Save the plot as a PNG file
     plt.savefig("ttt_plot.png")
+
+
+def log_progress(
+    i: int,
+    episodes: int,
+    hyperparams: dict,
+    ttts: list,
+    interval: int = 50,
+    window: int = 50,
+) -> None:
+    """
+    Logs training progress.
+
+
+    :param i: Current episode index.
+    :param episodes: Total number of episodes.
+    :param hyperparams: Dictionary containing training hyperparameters.
+    :param ttts: List of time-to-target (or similar metric).
+    :param interval: How often to print detailed info.
+    :param window: Number of entries to average for first/last comparison.
+    """
+    # Progress bar
+    percent = (i + 1) / episodes * 100
+    bar = "=" * int(percent // 2)  # 50-char bar
+    sys.stdout.write(f"\rProgress: [{bar:<50}] {percent:.1f}%")
+    sys.stdout.flush()
+
+    # Print extra info every `interval` episodes or on final episode
+    if (i + 1) % interval == 0 or (i + 1) == episodes:
+        ttts_array = np.array(ttts)
+        first_mean = (
+            np.mean(ttts_array[:window]) if len(ttts_array) >= 1 else float("nan")
+        )
+        last_mean = (
+            np.mean(ttts_array[-window:]) if len(ttts_array) >= 1 else float("nan")
+        )
+
+        sys.stdout.write(
+            f"\nEpsilon: {hyperparams['epsilon']:.4f} | "
+            f"TTT first {window}: {first_mean:.2f} | "
+            f"TTT last {window}: {last_mean:.2f}\n"
+        )
+        sys.stdout.flush()
 
 
 def main() -> None:
@@ -158,14 +202,8 @@ def main() -> None:
                 idx
             ] + hyperparams["alpha"] * reward
 
-        # Printing
-        percent = (i + 1) / episodes * 100
-        bar = "=" * int(percent // 2)  # 50-char bar
-        sys.stdout.write(
-            f"\rProgress: [{bar:<50}] {percent:.1f}%, epsilon: {hyperparams['epsilon']}, "
-            f"TTT: {total_tt}"
-        )
-        sys.stdout.flush()
+        # Logging
+        log_progress(i=i, episodes=episodes, hyperparams=hyperparams, ttts=ttts)
 
         # Reduce epsilon
         hyperparams["epsilon"] = max(
