@@ -2,11 +2,11 @@
 
 import xml.etree.ElementTree as ET
 
+import matplotlib.pyplot as plt
 from utils import utils as ut
 
 from marl_incentives import environment as env
 from marl_incentives import traveller as tr
-import matplotlib.pyplot as plt
 
 
 def parse_weights(xml_file):
@@ -118,6 +118,9 @@ def main() -> None:
         else tr.initialise_q_function_no_incentives(actions_costs=actions_and_costs)
     )
 
+    # Instantiate network object
+    network_env = env.Network(paths_dict=paths_dict, sumo_params=sumo_params)
+
     # Train RL agent
     for _ in range(episodes):
         # Select policy function based on whether incentives are used or not
@@ -132,11 +135,9 @@ def main() -> None:
             strategy=config["strategy"],
         )
         # Perform actions given by policy
-        total_tt, ind_tt, ind_em, total_em = env.step(
+        total_tt, ind_tt, ind_em, total_em = network_env.step(
             edge_data_frequency=edge_data_frequency,
             routes_edges=routes_edges,
-            paths_dict=paths_dict,
-            sumo_params=sumo_params,
         )
 
         # Record TTT and total emissions throughout iterations

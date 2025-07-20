@@ -1,5 +1,5 @@
 # Number of training episodes for the RL agent
-episodes: 300
+episodes: 2
 
 ### Weights for different components of the reward/cost function
 # Weight for Total Travel Time (TTT) of the network
@@ -11,9 +11,6 @@ emissions_weight: 0
 # Total emissions weight
 total_emissions_weight: 0
 
-# Number of incentives options
-n_incentives: 2
-
 # Exploration rate for epsilon-greedy policy
 epsilon: 0.9
 # Epsilon decay rate per episode (to reduce exploration over time)
@@ -21,7 +18,7 @@ decay: 0.996
 # Learning rate (α) for Q-learning or other value update algorithms
 alpha: 0.1
 # Total available budget for incentives or policies (can be used as a constraint)
-total_budget: 10000000
+total_budget: 50000
 # Whether to use incentives or not
 incentives_mode: true
 # Select route selection strategy
