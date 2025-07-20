@@ -1,5 +1,5 @@
 # Number of training episodes for the RL agent
-episodes: 2
+episodes: 500
 
 ### Weights for different components of the reward/cost function
 # Weight for Total Travel Time (TTT) of the network
@@ -18,7 +18,9 @@ decay: 0.996
 # Learning rate (α) for Q-learning or other value update algorithms
 alpha: 0.1
 # Total available budget for incentives or policies (can be used as a constraint)
-total_budget: 50000
+total_budget:
+  - 50000
+  - 100000000
 # Whether to use incentives or not
 incentives_mode: true
 # Select route selection strategy

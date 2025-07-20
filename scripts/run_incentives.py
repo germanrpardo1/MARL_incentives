@@ -1,11 +1,7 @@
 """This script runs the MARL algorithm with and without incentives."""
 
-import pickle
-import sys
 import xml.etree.ElementTree as ET
 
-import matplotlib.pyplot as plt
-import numpy as np
 from utils import utils as ut
 
 from marl_incentives import environment as env
@@ -61,101 +57,13 @@ def calculate_route_cost(actions, weights):
     return costs_r
 
 
-def save_plot_and_file(
-    values: list,
-    window: int = 30,
-    path_to_pickle: str = "results/pickle_files/ttt/ttt",
-    path_to_plot: str = "results/plots/ttt",
-) -> None:
-    """
-    Save a plot of the moving average and a pickle file of raw values.
-
-    :param values: List of raw values to save.
-    :param window: Window size for moving average.
-    :param path_to_pickle: Path to the pickle file.
-    :param path_to_plot: Path to the plots.
-    """
-    if not values:
-        return
-
-    arr = np.array(values)
-
-    # Compute moving average
-    if len(arr) >= window:
-        smoothed = np.convolve(arr, np.ones(window) / window, mode="valid")
-        x = np.arange(window - 1, len(arr))
-    else:
-        smoothed = []
-        x = []
-
-    # Plot only the moving average
-    plt.figure(figsize=(10, 5))
-    if smoothed:
-        plt.plot(
-            x, smoothed, label=f"Moving Avg ({window})", color="orange", linewidth=2
-        )
-    plt.title("Total Travel Time per Episode")
-    plt.xlabel("Episode")
-    plt.ylabel("TTT")
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(f"{path_to_plot}_plot.png")
-    plt.close()
-
-    # Save raw values as pickle
-    with open(f"{path_to_pickle}_values.pkl", "wb") as f:
-        pickle.dump(values, f)
-
-
-def log_progress(
-    i: int,
-    episodes: int,
-    hyperparams: dict,
-    ttts: list,
-    interval: int = 50,
-    window: int = 50,
-) -> None:
-    """
-    Logs training progress.
-
-
-    :param i: Current episode index.
-    :param episodes: Total number of episodes.
-    :param hyperparams: Dictionary containing training hyperparameters.
-    :param ttts: List of time-to-target (or similar metric).
-    :param interval: How often to print detailed info.
-    :param window: Number of entries to average for first/last comparison.
-    """
-    # Progress bar
-    percent = (i + 1) / episodes * 100
-    bar = "=" * int(percent // 2)  # 50-char bar
-    sys.stdout.write(f"\rProgress: [{bar:<50}] {percent:.1f}%")
-    sys.stdout.flush()
-
-    # Print extra info every `interval` episodes or on final episode
-    if (i + 1) % interval == 0 or (i + 1) == episodes:
-        ttts_array = np.array(ttts)
-        first_mean = (
-            np.mean(ttts_array[:window]) if len(ttts_array) >= 1 else float("nan")
-        )
-        last_mean = (
-            np.mean(ttts_array[-window:]) if len(ttts_array) >= 1 else float("nan")
-        )
-
-        sys.stdout.write(
-            f"\nEpsilon: {hyperparams['epsilon']:.4f} | "
-            f"TTT first {window}: {first_mean:.2f} | "
-            f"TTT last {window}: {last_mean:.2f}\n"
-        )
-        sys.stdout.flush()
-
-
-def main() -> None:
+def main(config: dict, total_budget: int) -> None:
     """
     Run the MARL algorithm with or without incentives.
+
+    :param config: Configuration dictionary.
+    :param total_budget: Total budget.
     """
-    # Load config
-    config = ut.load_config(path="scripts/config.yaml")
     incentives_mode = config["incentives_mode"]
     episodes = config["episodes"]
 
@@ -174,8 +82,6 @@ def main() -> None:
         "alpha": config["alpha"],
     }
 
-    # Total budget for the incentives
-    total_budget = config["total_budget"]
     # Dictionary with all paths
     paths_dict = config["paths_dict"]
     # Define edge data granularity
@@ -238,7 +144,7 @@ def main() -> None:
             ] + hyperparams["alpha"] * reward
 
         # Logging
-        log_progress(i=i, episodes=episodes, hyperparams=hyperparams, ttts=ttts)
+        ut.log_progress(i=i, episodes=episodes, hyperparams=hyperparams, ttts=ttts)
 
         # Reduce epsilon
         hyperparams["epsilon"] = max(
@@ -249,8 +155,18 @@ def main() -> None:
         # costs = calculate_route_cost(actions, parse_weights("data/weights.xml"))
 
     # Save the plot and pickle file
-    save_plot_and_file(values=ttts)
+    ut.save_plot_and_file(
+        values=ttts,
+        window=30,
+        path_to_pickle=f"results/pickle_files/ttt/ttt_{total_budget}",
+        path_to_plot=f"results/plots/ttt_{total_budget}",
+    )
 
 
 if __name__ == "__main__":
-    main()
+    # Load config
+    config_file = ut.load_config(path="scripts/config.yaml")
+
+    # Loop for different budgets
+    for total_budget in config_file["total_budget"]:
+        main(config=config_file, total_budget=total_budget)
