@@ -3,6 +3,7 @@
 import xml.etree.ElementTree as ET
 
 import matplotlib.pyplot as plt
+import sys
 from utils import utils as ut
 
 from marl_incentives import environment as env
@@ -122,7 +123,7 @@ def main() -> None:
     network_env = env.Network(paths_dict=paths_dict, sumo_params=sumo_params)
 
     # Train RL agent
-    for _ in range(episodes):
+    for i in range(episodes):
         # Select policy function based on whether incentives are used or not
         # Get actions from policy
         routes_edges, actions_index = tr.policy_function(
@@ -157,14 +158,23 @@ def main() -> None:
                 idx
             ] + hyperparams["alpha"] * reward
 
+        # Printing
+        percent = (i + 1) / episodes * 100
+        bar = "=" * int(percent // 2)  # 50-char bar
+        sys.stdout.write(
+            f"\rProgress: [{bar:<50}] {percent:.1f}%, epsilon: {hyperparams['epsilon']}, "
+            f"TTT: {total_tt}"
+        )
+        sys.stdout.flush()
+
+        # Reduce epsilon
         hyperparams["epsilon"] = max(
             0.01, hyperparams["epsilon"] * hyperparams["decay"]
         )
-        print(_)
-        print(total_tt)
-        save_plot_ttt(ttts)
+
         # Retrieve updated route costs
         # costs = calculate_route_cost(actions, parse_weights("data/weights.xml"))
+    save_plot_ttt(ttts)
 
 
 if __name__ == "__main__":
