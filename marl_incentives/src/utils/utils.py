@@ -76,10 +76,10 @@ def save_plot_and_file(
         x, smoothed, label=f"Moving Avg ({actual_window})", color="orange", linewidth=2
     )
 
-    plt.title("Total Travel Time per Episode")
+    plt.title("Total travel time per episode")
     plt.xlabel("Episode")
-    plt.ylabel("TTT")
-    plt.grid(True)
+    plt.ylabel("TTT [h]")
+    plt.grid(False)
     plt.tight_layout()
     plt.savefig(f"{path_to_plot}_plot.png")
     plt.close()

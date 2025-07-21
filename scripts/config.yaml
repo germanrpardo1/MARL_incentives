@@ -14,11 +14,12 @@ total_emissions_weight: 0
 # Exploration rate for epsilon-greedy policy
 epsilon: 0.9
 # Epsilon decay rate per episode (to reduce exploration over time)
-decay: 0.996
+decay: 0.992
 # Learning rate (α) for Q-learning or other value update algorithms
 alpha: 0.1
 # Total available budget for incentives or policies (can be used as a constraint)
 total_budget:
+  - 0
   - 50000
   - 100000000
 # Whether to use incentives or not

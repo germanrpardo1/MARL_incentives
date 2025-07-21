@@ -27,18 +27,15 @@ class Network:
 
     def run_simulation(self) -> None:
         """Run a SUMO simulation."""
-        sys.stdout = sumolib.TeeFile(
-            sys.stdout, open(self.paths_dict["log_path"], "w+")
-        )
-        log = open(self.paths_dict["log_path"], "w+")
+        log_file = open(self.paths_dict["log_path"], "w+")
+        sys.stdout = sumolib.TeeFile(sys.__stdout__, log_file)
 
-        log.flush()
-        sys.stdout.flush()
+        log_file.flush()
+        sys.__stdout__.flush()
 
         sumo_cmd = ["sumo", "-c", self.sumo_params["config_path"]]
-
         sumo_cmd = list(map(str, sumo_cmd))
-        subprocess.call(sumo_cmd, stdout=log, stderr=log)
+        subprocess.call(sumo_cmd, stdout=log_file, stderr=log_file)
 
     def step(
         self,
