@@ -1,0 +1,19 @@
+[project]
+name = "co2Emissions"
+version = "0.1.0"
+description = "CO2 emissions modeling"
+authors = [{name = "Germán Pardo G"}]
+readme = "README.md"
+requires-python = ">=3.8"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+

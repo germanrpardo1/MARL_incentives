@@ -110,8 +110,8 @@ def log_progress(
     """
     # Progress bar
     percent = (i + 1) / episodes * 100
-    bar = "=" * int(percent // 2)  # 50-char bar
-    sys.stdout.write(f"\rProgress: [{bar:<50}] {percent:.1f}%")
+    prog_bar = "=" * int(percent // 2)  # 50-char bar
+    sys.stdout.write(f"\rProgress: [{prog_bar:<50}] {percent:.1f}%")
     sys.stdout.flush()
 
     # Print extra info every `interval` episodes or on final episode

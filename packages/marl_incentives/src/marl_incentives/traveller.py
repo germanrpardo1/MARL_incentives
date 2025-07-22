@@ -198,11 +198,11 @@ def route_selection_strategy(costs: list, strategy: str = "argmin") -> int:
     if strategy == "argmin":
         return int(np.argmin(costs))
 
-    elif strategy == "prob_distribution":
+    if strategy == "prob_distribution":
         probs = costs / np.sum(costs)
         return int(_rng.choice(len(costs), p=probs))
 
-    elif strategy == "logit":
+    if strategy == "logit":
         # Inverse utility (lower cost -> higher probability)
         exp_utilities = np.exp(-costs / max(costs))
         probs = exp_utilities / np.sum(exp_utilities)
@@ -274,11 +274,11 @@ def policy_function(incentives_mode: bool, **kwargs: Any) -> tuple[dict, dict]:
     """
     if incentives_mode:
         return policy_incentives(**kwargs)
-    else:
-        # Remove total_budget if it exists (safe removal)
-        kwargs.pop("total_budget", None)
-        kwargs.pop("strategy", None)
-        return policy_no_incentives(**kwargs)
+
+    # Remove total_budget if it exists (safe removal)
+    kwargs.pop("total_budget", None)
+    kwargs.pop("strategy", None)
+    return policy_no_incentives(**kwargs)
 
 
 # TODO(German): look at reward - only normalising some and TTT no

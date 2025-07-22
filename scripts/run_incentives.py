@@ -2,10 +2,9 @@
 
 import xml.etree.ElementTree as ET
 
-from utils import utils as ut
-
 from marl_incentives import environment as env
 from marl_incentives import traveller as tr
+from utils import utils as ut
 
 
 def parse_weights(xml_file):
@@ -168,5 +167,5 @@ if __name__ == "__main__":
     config_file = ut.load_config(path="scripts/config.yaml")
 
     # Loop for different budgets
-    for total_budget in config_file["total_budget"]:
-        main(config=config_file, total_budget=total_budget)
+    for tot_budget in config_file["total_budget"]:
+        main(config=config_file, total_budget=tot_budget)

@@ -38,37 +38,37 @@
 
 def co2modeler(velocity: float, acceleration: float, type: str, fuel: str):
     if fuel == "gasoline":
-        T_idle = 2392  # CO2 emission from gasoline [gCO2/L]
-        E_gas = 31.5e6  # Energy in gasoline [J\L]
+        t_idle = 2392  # CO2 emission from gasoline [gCO2/L]
+        e_gas = 31.5e6  # Energy in gasoline [J\L]
     elif fuel == "diesel":
-        T_idle = 2660  # CO2 emission from diesel [gCO2/L]
-        E_gas = 38e6  # Energy in diesel [J\L]
+        t_idle = 2660  # CO2 emission from diesel [gCO2/L]
+        e_gas = 38e6  # Energy in diesel [J\L]
 
     if type == "light_passenger":
-        M = 1334  # light-duty passenger vehicle mass [kg]
+        m = 1334  # light-duty passenger vehicle mass [kg]
     elif type == "light_van":
-        M = 1752  # light-duty van vehicle mass [kg]
+        m = 1752  # light-duty van vehicle mass [kg]
 
-    Crr = 0.015  # Rolling resistance
-    Cd = 0.3  # Aerodynamic drag coefficient
-    A = 2.5  # Frontal area [m2]
+    crr = 0.015  # Rolling resistance
+    cd = 0.3  # Aerodynamic drag coefficient
+    a = 2.5  # Frontal area [m2]
     g = 9.81  # Gravitational acceleration
     r = 0  # Regeneration efficiency ratio
     pho = 1.225  # Air density
     fuel_eff = 0.7  # fuel efficiency [70%]
 
     condition = (
-        M * acceleration * velocity
-        + M * g * Crr * velocity
-        + 0.5 * Cd * A * pho * velocity**3
+        m * acceleration * velocity
+        + m * g * crr * velocity
+        + 0.5 * cd * a * pho * velocity**3
     )
 
-    Ei = T_idle / E_gas * condition
+    ei = t_idle / e_gas * condition
 
-    if Ei <= 0:
+    if ei <= 0:
         E = r
     else:
-        Ei = Ei * (velocity + 0.5 * acceleration)
-        E = Ei / fuel_eff
+        ei = ei * (velocity + 0.5 * acceleration)
+        E = ei / fuel_eff
 
     return "%.2f" % E

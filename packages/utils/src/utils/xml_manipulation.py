@@ -42,7 +42,7 @@ def write_sumo_config(
     :param routes_path: Path to the routes file.
     """
     # This is the directory your script is in
-    script_dir = Path(__file__).resolve().parent
+    script_dir = Path(__file__).resolve().parent.parent
     # Navigate up to the project root and into 'data'
     ### Fix
     data_path = script_dir.parent.parent.parent / "data" / "edge_data.add.xml"

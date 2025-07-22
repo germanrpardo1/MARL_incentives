@@ -10,6 +10,8 @@ from utils import xml_manipulation as xmlm
 
 
 class Network:
+    """Represents the network for the simulation."""
+
     def __init__(
         self,
         paths_dict: dict,
@@ -27,7 +29,7 @@ class Network:
 
     def run_simulation(self) -> None:
         """Run a SUMO simulation."""
-        log_file = open(self.paths_dict["log_path"], "w+")
+        log_file = open(self.paths_dict["log_path"], "w+", encoding="utf-8")
         sys.stdout = sumolib.TeeFile(sys.__stdout__, log_file)
 
         log_file.flush()
