@@ -20,6 +20,7 @@ alpha: 0.1
 # Total available budget for incentives or policies (can be used as a constraint)
 total_budget:
   - 0
+  - 10000
   - 50000
   - 100000000
 # Whether to use incentives or not
