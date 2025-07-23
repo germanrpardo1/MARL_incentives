@@ -2,9 +2,8 @@
 
 import xml.etree.ElementTree as ET
 
-from marl_incentives import environment as env
+from marl_incentives import environment as env, utils as ut
 from marl_incentives import traveller as tr
-from utils import utils as ut
 
 
 def parse_weights(xml_file):

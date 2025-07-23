@@ -1,9 +1,8 @@
 [project]
 name = "marl_incentives"
 version = "0.1.0"
-description = "CO2 emissions modeling"
-authors = [{name = "Germán Pardo G"}]
-readme = "README.md"
+description = "Packages for the MARL incentives algorithm."
+authors = [{name = "Germán Pardo González"}]
 requires-python = ">=3.8"
 
 [tool.setuptools]

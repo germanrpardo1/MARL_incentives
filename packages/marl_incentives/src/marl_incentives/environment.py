@@ -3,10 +3,9 @@
 import subprocess
 import sys
 
-import co2Emissions.calculate_emissions as em
+import marl_incentives.calculate_emissions as em
 import sumolib
-from utils import utils as ut
-from utils import xml_manipulation as xmlm
+from marl_incentives import utils as ut, xml_manipulation as xmlm
 
 
 class Network:

@@ -9,7 +9,7 @@
 from collections import defaultdict
 from xml.etree.ElementTree import iterparse
 
-from co2Emissions.co2modeler_v1 import co2modeler  # Import the CO2 modeler
+from marl_incentives.co2modeler_v1 import co2modeler  # Import the CO2 modeler
 
 
 def co2_main(path):
