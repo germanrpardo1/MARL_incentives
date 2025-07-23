@@ -95,6 +95,7 @@ def main(config: dict, total_budget: int) -> None:
 
     ttts = []
     emissions_total = []
+    labels_dict = {}
 
     # Initialise the Q-function
     q_values = (
@@ -153,12 +154,25 @@ def main(config: dict, total_budget: int) -> None:
         # Retrieve updated route costs
         # costs = calculate_route_cost(actions, parse_weights("data/weights.xml"))
 
-    # Save the plot and pickle file
+    # Save the plot and pickle file for TTT
+    labels_dict["title"] = "Total travel time per episode"
+    labels_dict["y_label"] = "TTT [h]"
     ut.save_plot_and_file(
         values=ttts,
+        labels=labels_dict,
         window=30,
         path_to_pickle=f"results/pickle_files/ttt/ttt_{total_budget}",
         path_to_plot=f"results/plots/ttt_{total_budget}",
+    )
+
+    labels_dict["title"] = "Total emissions per episode"
+    labels_dict["y_label"] = "Emissions [kg]"
+    # Save the plot and pickle file for emissions
+    ut.save_plot_and_file(
+        values=emissions_total,
+        window=30,
+        path_to_pickle=f"results/pickle_files/emissions/emissions_{total_budget}",
+        path_to_plot=f"results/plots/emissions_{total_budget}",
     )
 
 

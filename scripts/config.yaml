@@ -1,5 +1,5 @@
 # Number of training episodes for the RL agent
-episodes: 2
+episodes: 500
 
 ### Weights for different components of the reward/cost function
 # Weight for Total Travel Time (TTT) of the network

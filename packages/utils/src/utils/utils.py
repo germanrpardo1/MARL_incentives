@@ -48,6 +48,7 @@ def normalise_dict(dict_to_normalise: dict) -> dict:
 
 def save_plot_and_file(
     values: list,
+    labels: dict,
     window: int = 30,
     path_to_pickle: str = "results/pickle_files/ttt/ttt",
     path_to_plot: str = "results/plots/ttt",
@@ -56,6 +57,7 @@ def save_plot_and_file(
     Save a plot of the moving average and a pickle file of raw values.
 
     :param values: List of raw values to save.
+    :param labels: Dictionary of labels for the plot.
     :param window: Window size for moving average.
     :param path_to_pickle: Path to the pickle file.
     :param path_to_plot: Path to the plots.
@@ -76,9 +78,9 @@ def save_plot_and_file(
         x, smoothed, label=f"Moving Avg ({actual_window})", color="orange", linewidth=2
     )
 
-    plt.title("Total travel time per episode")
+    plt.title(labels["title"])
     plt.xlabel("Episode")
-    plt.ylabel("TTT [h]")
+    plt.ylabel(labels["y_label"])
     plt.grid(False)
     plt.tight_layout()
     plt.savefig(f"{path_to_plot}_plot.png")
