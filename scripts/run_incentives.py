@@ -170,6 +170,7 @@ def main(config: dict, total_budget: int) -> None:
     # Save the plot and pickle file for emissions
     ut.save_plot_and_file(
         values=emissions_total,
+        labels=labels_dict,
         window=30,
         path_to_pickle=f"results/pickle_files/emissions/emissions_{total_budget}",
         path_to_plot=f"results/plots/emissions_{total_budget}",

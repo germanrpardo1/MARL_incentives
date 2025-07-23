@@ -72,15 +72,10 @@ class Network:
         individual_tt = ut.normalise_dict(
             xmlm.get_individual_travel_times(self.paths_dict["trip_info_path"])
         )
-        individual_emissions = ut.normalise_dict(
-            em.calculate_emissions_per_vehicle(
-                self.paths_dict["emissions_per_vehicle_path"]
-            )
+
+        total_emissions, individual_emissions = em.co2_main(
+            self.paths_dict["emissions_path"]
         )
-        total_emissions = ut.normalise_scalar(
-            min_val=300,
-            max_val=330,
-            val=em.co2_main(self.paths_dict["emissions_path"]) / 1000,
-        )
+        individual_emissions = ut.normalise_dict(individual_emissions)
 
         return total_tt, individual_tt, individual_emissions, total_emissions
