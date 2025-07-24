@@ -3,9 +3,10 @@
 import subprocess
 import sys
 
-import marl_incentives.calculate_emissions as em
 import sumolib
-from marl_incentives import utils as ut, xml_manipulation as xmlm
+
+import marl_incentives.calculate_emissions as em
+from marl_incentives import xml_manipulation as xmlm
 
 
 class Network:
@@ -66,15 +67,14 @@ class Network:
         # Run SUMO simulation
         self.run_simulation()
 
-        # Process outputs
+        # Get travel times
         total_tt = xmlm.get_ttt(self.paths_dict["stats_path"])
-        individual_tt = ut.normalise_dict(
-            xmlm.get_individual_travel_times(self.paths_dict["trip_info_path"])
+        individual_tt = xmlm.get_individual_travel_times(
+            self.paths_dict["trip_info_path"]
         )
-
+        # Get emissions
         total_emissions, individual_emissions = em.co2_main(
             self.paths_dict["emissions_path"]
         )
-        individual_emissions = ut.normalise_dict(individual_emissions)
 
         return total_tt, individual_tt, individual_emissions, total_emissions

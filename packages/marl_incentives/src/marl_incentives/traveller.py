@@ -208,8 +208,7 @@ def route_selection_strategy(costs: list, strategy: str = "argmin") -> int:
         probs = exp_utilities / np.sum(exp_utilities)
         return int(_rng.choice(len(costs), p=probs))
 
-    else:
-        raise ValueError(f"Unknown strategy: {strategy}")
+    raise ValueError(f"Unknown strategy: {strategy}")
 
 
 def policy_incentives(
@@ -281,7 +280,6 @@ def policy_function(incentives_mode: bool, **kwargs: Any) -> tuple[dict, dict]:
     return policy_no_incentives(**kwargs)
 
 
-# TODO(German): look at reward - only normalising some and TTT no
 def compute_reward(
     trip: str,
     ind_tt: dict,

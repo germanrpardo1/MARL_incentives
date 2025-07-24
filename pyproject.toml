@@ -7,9 +7,12 @@ authors = [
     { name = "Germán Pardo-González", email = "germanrpardo1@outlook.com" }
 ]
 requires-python = ">=3.13"
+
 dependencies = [
+    "hatchling>=1.27.0",
+    "lxml>=6.0.0",
     "matplotlib>=3.10.3",
-    "numpy>=2.3.1",
+    "numpy>=2.3.2",
     "pre-commit>=4.2.0",
     "setuptools>=61.0",
     "sphinx>=8.2.3",
