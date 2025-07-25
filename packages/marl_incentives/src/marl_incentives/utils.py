@@ -1,5 +1,6 @@
 """This module provides general useful functions"""
 
+import os
 import pickle
 import sys
 
@@ -19,33 +20,6 @@ def load_config(path: str = "scripts/config.yaml") -> dict:
         return yaml.safe_load(file)
 
 
-def normalise_scalar(min_val: float, max_val: float, val: float) -> float:
-    """
-    Normalise a given scalar value.
-
-    :param min_val: Minimum scalar value.
-    :param max_val: Maximum scalar value.
-    :param val: Scalar value to normalise.
-
-    :return: Normalised scalar value.
-    """
-    return (val - min_val) / (max_val - min_val)
-
-
-def normalise_dict(dict_to_normalise: dict) -> dict:
-    """
-    Normalise the values in the dictionary.
-
-    :param dict_to_normalise: Dictionary for which the values will be normalised.
-    :return: Normalised dictionary.
-    """
-    min_v, max_v = min(dict_to_normalise.values()), max(dict_to_normalise.values())
-    return {
-        k: (v - min_v) / (max_v - min_v) if max_v != min_v else 0
-        for k, v in dict_to_normalise.items()
-    }
-
-
 def save_plot_and_file(
     values: list,
     labels: dict,
@@ -62,7 +36,7 @@ def save_plot_and_file(
     :param path_to_pickle: Path to the pickle file.
     :param path_to_plot: Path to the plots.
     """
-    if not values:
+    if os.path.exists(path_to_pickle) or os.path.exists(path_to_plot) or not values:
         return
 
     arr = np.array(values)
