@@ -77,4 +77,4 @@ class Network:
             self.paths_dict["emissions_path"]
         )
 
-        return total_tt, individual_tt, individual_emissions, total_emissions
+        return total_tt, individual_tt, individual_emissions, total_emissions / 1000
