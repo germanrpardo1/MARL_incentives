@@ -128,7 +128,7 @@ def main(config: dict, total_budget: int) -> None:
 
         # Record TTT and total emissions throughout iterations
         ttts.append(total_tt)
-        emissions_total.append(total_em * 30 + 300)
+        emissions_total.append(total_em)
 
         # For each agent update Q function
         # Q(a) = (1 - alpha) * Q(a) + alpha * r
