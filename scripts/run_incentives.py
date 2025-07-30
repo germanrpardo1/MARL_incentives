@@ -1,59 +1,50 @@
 """This script runs the MARL algorithm with and without incentives."""
 
-import xml.etree.ElementTree as ET
+import os
 
 from marl_incentives import environment as env
 from marl_incentives import traveller as tr
 from marl_incentives import utils as ut
 
 
-def parse_weights(xml_file):
-    tree = ET.parse(xml_file)
-    root = tree.getroot()
-    weights = {}
+def save_metric(
+    values: list[float],
+    labels: dict,
+    base_name: str,
+    y_label: str,
+    budget: int,
+    weights: dict,
+) -> None:
+    """
+    Save a plot and corresponding pickle file for a given metric using consistent naming conventions.
 
-    for interval in root.findall(".//interval"):
-        begin, end = float(interval.get("begin")), float(interval.get("end"))
-        for edge in interval.findall(".//edge"):
-            edge_id = edge.get("id")
-            travel_time = float(edge.get("traveltime", 0))
-            if edge_id not in weights:
-                weights[edge_id] = []
-            weights[edge_id].append((begin, end, travel_time))
+    :param values: List of metric values over time (e.g., per episode).
+    :param labels: Dictionary of plot labels (e.g., title, y-axis label).
+    :param base_name: The metric name (used in file naming and plot title).
+    :param y_label: Y-axis label for the plot.
+    :param budget: Total budget used in the experiment.
+    :param weights: Dictionary of weights used in the experiment.
+    :return: None
+    """
+    labels["title"] = f"{base_name.replace('_', ' ').title()} per episode"
+    labels["y_label"] = y_label
 
-    return weights
+    # Generate file paths
+    pickle_path = ut.make_file_paths(base_name, "pickle_files", budget, weights, "pkl")
+    plot_path = ut.make_file_paths(base_name, "plots", budget, weights, "png")
 
+    # Ensure directories exist
+    os.makedirs(os.path.dirname(pickle_path), exist_ok=True)
+    os.makedirs(os.path.dirname(plot_path), exist_ok=True)
 
-def get_travel_time(edge_id, timestamp, weights):
-    if edge_id not in weights:
-        return float(0)
-
-    for begin, end, travel_time in weights[edge_id]:
-        if begin <= timestamp < end:
-            return travel_time
-
-    return float(0)
-
-
-def calculate_route_cost(actions, weights):
-    costs_r = {}
-
-    for i, (trip, routes) in enumerate(actions.items()):
-        trip_costs = []
-        for _, route in routes:
-            timestamp = i * 0.09  # Initial departure time for each trip
-            total_cost = 0
-
-            for edge in route:
-                travel_time = get_travel_time(edge, timestamp, weights)
-                total_cost += travel_time
-                timestamp += travel_time  # Update timestamp as we move through edges
-
-            trip_costs.append(round(total_cost, 2))
-
-        costs_r[trip] = trip_costs
-
-    return costs_r
+    # Save the plot and pickle
+    ut.save_plot_and_file(
+        values=values,
+        labels=labels,
+        window=30,
+        path_to_pickle=pickle_path,
+        path_to_plot=plot_path,
+    )
 
 
 def main(config: dict, total_budget: int) -> None:
@@ -154,26 +145,15 @@ def main(config: dict, total_budget: int) -> None:
         # Retrieve updated route costs
         # costs = calculate_route_cost(actions, parse_weights("data/weights.xml"))
 
-    # Save the plot and pickle file for TTT
-    labels_dict["title"] = "Total travel time per episode"
-    labels_dict["y_label"] = "TTT [h]"
-    ut.save_plot_and_file(
-        values=ttts,
-        labels=labels_dict,
-        window=30,
-        path_to_pickle=f"results/pickle_files/ttt/ttt_{total_budget}",
-        path_to_plot=f"results/plots/ttt_{total_budget}",
-    )
-
-    labels_dict["title"] = "Total emissions per episode"
-    labels_dict["y_label"] = "Emissions [kg]"
-    # Save the plot and pickle file for emissions
-    ut.save_plot_and_file(
-        values=emissions_total,
-        labels=labels_dict,
-        window=30,
-        path_to_pickle=f"results/pickle_files/emissions/emissions_{total_budget}",
-        path_to_plot=f"results/plots/emissions_{total_budget}",
+    # Save the plot and pickle file for TTT and emissions
+    save_metric(ttts, labels_dict, "ttt", "TTT [h]", total_budget, weights)
+    save_metric(
+        emissions_total,
+        labels_dict,
+        "emissions",
+        "Emissions [kg]",
+        total_budget,
+        weights,
     )
 
 

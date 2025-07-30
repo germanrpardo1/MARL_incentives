@@ -181,3 +181,20 @@ def get_ttt(file="data/stats.xml"):
     with open(file, "rb") as f:
         root = ET.parse(f).getroot()
     return float(root.find("vehicleTripStatistics").get("totalTravelTime")) / (60**2)
+
+
+def parse_weights(xml_file):
+    tree = ET.parse(xml_file)
+    root = tree.getroot()
+    weights = {}
+
+    for interval in root.findall(".//interval"):
+        begin, end = float(interval.get("begin")), float(interval.get("end"))
+        for edge in interval.findall(".//edge"):
+            edge_id = edge.get("id")
+            travel_time = float(edge.get("traveltime", 0))
+            if edge_id not in weights:
+                weights[edge_id] = []
+            weights[edge_id].append((begin, end, travel_time))
+
+    return weights

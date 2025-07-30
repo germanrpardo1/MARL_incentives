@@ -23,18 +23,18 @@ def load_config(path: str = "scripts/config.yaml") -> dict:
 def save_plot_and_file(
     values: list,
     labels: dict,
+    path_to_pickle: str,
+    path_to_plot: str,
     window: int = 30,
-    path_to_pickle: str = "results/pickle_files/ttt/ttt",
-    path_to_plot: str = "results/plots/ttt",
 ) -> None:
     """
     Save a plot of the moving average and a pickle file of raw values.
 
     :param values: List of raw values to save.
     :param labels: Dictionary of labels for the plot.
-    :param window: Window size for moving average.
     :param path_to_pickle: Path to the pickle file.
     :param path_to_plot: Path to the plots.
+    :param window: Window size for moving average.
     """
     if os.path.exists(path_to_pickle) or os.path.exists(path_to_plot) or not values:
         return
@@ -57,11 +57,11 @@ def save_plot_and_file(
     plt.ylabel(labels["y_label"])
     plt.grid(False)
     plt.tight_layout()
-    plt.savefig(f"{path_to_plot}_plot.png")
+    plt.savefig(f"{path_to_plot}.png")
     plt.close()
 
     # Save raw values as pickle
-    with open(f"{path_to_pickle}_values.pkl", "wb") as f:
+    with open(f"{path_to_pickle}.pkl", "wb") as f:
         pickle.dump(values, f)
 
 
@@ -106,3 +106,54 @@ def log_progress(
             f"TTT last {window}: {last_mean:.2f}\n"
         )
         sys.stdout.flush()
+
+
+def make_file_paths(
+    base_name: str, subfolder: str, budget: int, weights: dict, ext: str
+) -> str:
+    """
+    Construct a full file path for saving plots or pickle files based on experiment parameters.
+
+    :param base_name: The base name for the metric (e.g., "ttt", "emissions").
+    :param subfolder: Subdirectory under 'results' (e.g., "plots", "pickle_files").
+    :param budget: The total budget used in the experiment.
+    :param weights: Dictionary containing weights, expects keys 'individual_tt' and 'individual_emissions'.
+    :param ext: File extension (e.g., "png", "pkl").
+    :return: Full file path as a string.
+    """
+    w_tt = round(weights["individual_tt"], 3)
+    w_em = round(weights["individual_emissions"], 3)
+    filename = f"{base_name}_{budget}_ttt_obj_{w_tt}_emissions_obj_{w_em}.{ext}"
+    return os.path.join(f"results/{subfolder}/{base_name}", filename)
+
+
+def get_travel_time(edge_id, timestamp, weights):
+    if edge_id not in weights:
+        return float(0)
+
+    for begin, end, travel_time in weights[edge_id]:
+        if begin <= timestamp < end:
+            return travel_time
+
+    return float(0)
+
+
+def calculate_route_cost(actions, weights):
+    costs_r = {}
+
+    for i, (trip, routes) in enumerate(actions.items()):
+        trip_costs = []
+        for _, route in routes:
+            timestamp = i * 0.09  # Initial departure time for each trip
+            total_cost = 0
+
+            for edge in route:
+                travel_time = get_travel_time(edge, timestamp, weights)
+                total_cost += travel_time
+                timestamp += travel_time  # Update timestamp as we move through edges
+
+            trip_costs.append(round(total_cost, 2))
+
+        costs_r[trip] = trip_costs
+
+    return costs_r
