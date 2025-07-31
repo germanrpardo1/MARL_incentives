@@ -24,7 +24,6 @@ def save_metric(
     :param y_label: Y-axis label for the plot.
     :param budget: Total budget used in the experiment.
     :param weights: Dictionary of weights used in the experiment.
-    :return: None
     """
     labels["title"] = f"{base_name.replace('_', ' ').title()} per episode"
     labels["y_label"] = y_label
@@ -44,6 +43,41 @@ def save_metric(
         window=30,
         path_to_pickle=pickle_path,
         path_to_plot=plot_path,
+    )
+
+
+def plot_multiple_budgets() -> None:
+    """Plot curves with different budgets."""
+    ut.plot_multiple_curves(
+        title="Minimising travel time",
+        y_label="TTT [h]",
+        budgets=config_file["total_budget"],
+        base_name="ttt",
+        weights={"individual_tt": 1, "individual_emissions": 0},
+    )
+
+    ut.plot_multiple_curves(
+        title="Minimising travel time",
+        y_label="Emissions [kg]",
+        budgets=config_file["total_budget"],
+        base_name="emissions",
+        weights={"individual_tt": 1, "individual_emissions": 0},
+    )
+
+    ut.plot_multiple_curves(
+        title="Minimising emissions",
+        y_label="TTT [h]",
+        budgets=config_file["total_budget"],
+        base_name="ttt",
+        weights={"individual_tt": 0, "individual_emissions": 1},
+    )
+
+    ut.plot_multiple_curves(
+        title="Minimising emissions",
+        y_label="Emissions [kg]",
+        budgets=config_file["total_budget"],
+        base_name="emissions",
+        weights={"individual_tt": 0, "individual_emissions": 1},
     )
 
 

@@ -57,12 +57,80 @@ def save_plot_and_file(
     plt.ylabel(labels["y_label"])
     plt.grid(False)
     plt.tight_layout()
-    plt.savefig(f"{path_to_plot}.png")
+    plt.savefig(f"{path_to_plot}")
     plt.close()
 
     # Save raw values as pickle
-    with open(f"{path_to_pickle}.pkl", "wb") as f:
+    with open(f"{path_to_pickle}", "wb") as f:
         pickle.dump(values, f)
+
+
+def plot_multiple_curves(
+    title: str,
+    y_label: str,
+    budgets: list,
+    window_size: int = 30,
+    base_name: str = "emissions",
+    weights: dict = {"individual_tt": 0, "individual_emissions": 1},
+    ext: str = "pdf",
+) -> None:
+    """
+    Plot smoothed curves from multiple budgets by reading values from pickle files and save the plot.
+
+    :param title: Title of the plot.
+    :param y_label: Label for the Y-axis.
+    :param budgets: List of budget values to plot.
+    :param window_size: Size of the smoothing window.
+    :param base_name: Metric name used in file naming and path creation.
+    :param weights: Weight dictionary used in file naming.
+    :param ext: Extension for saved plot file (e.g., 'pdf' or 'png').
+    """
+
+    for budget in budgets:
+        file_path = make_file_paths(
+            base_name=base_name,
+            subfolder="pickle_files",
+            budget=budget,
+            weights=weights,
+            ext="pkl",
+        )
+
+        if not os.path.exists(file_path):
+            print(f"File not found: {file_path}")
+            continue
+
+        with open(file_path, "rb") as f:
+            values = pickle.load(f)
+
+        arr = np.array(values)
+        actual_window = min(window_size, len(arr))
+        smoothed = np.convolve(
+            arr, np.ones(actual_window) / actual_window, mode="valid"
+        )
+        x = np.arange(actual_window - 1, len(arr))
+        plt.plot(x, smoothed, label=f"Budget {budget}", linewidth=2)
+
+    plt.legend()
+    plt.title(title)
+    plt.xlabel("Episodes")
+    plt.ylabel(y_label)
+
+    # Use first budget to build save path
+    save_path = make_file_paths(
+        base_name=base_name,
+        subfolder="plots",
+        budget=budgets[0],
+        weights=weights,
+        ext=ext,
+    )
+    if os.path.exists(save_path):
+        plt.close()
+        return
+    # Make sure the directory exists
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+    plt.savefig(save_path, format=ext, bbox_inches="tight")
+    plt.close()
 
 
 def log_progress(
