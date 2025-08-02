@@ -16,7 +16,8 @@ def save_metric(
     weights: dict,
 ) -> None:
     """
-    Save a plot and corresponding pickle file for a given metric using consistent naming conventions.
+    Save a plot and corresponding pickle file for a given metric using
+        consistent naming conventions.
 
     :param values: List of metric values over time (e.g., per episode).
     :param labels: Dictionary of plot labels (e.g., title, y-axis label).
@@ -43,41 +44,6 @@ def save_metric(
         window=30,
         path_to_pickle=pickle_path,
         path_to_plot=plot_path,
-    )
-
-
-def plot_multiple_budgets() -> None:
-    """Plot curves with different budgets."""
-    ut.plot_multiple_curves(
-        title="Minimising travel time",
-        y_label="TTT [h]",
-        budgets=config_file["total_budget"],
-        base_name="ttt",
-        weights={"individual_tt": 1, "individual_emissions": 0},
-    )
-
-    ut.plot_multiple_curves(
-        title="Minimising travel time",
-        y_label="Emissions [kg]",
-        budgets=config_file["total_budget"],
-        base_name="emissions",
-        weights={"individual_tt": 1, "individual_emissions": 0},
-    )
-
-    ut.plot_multiple_curves(
-        title="Minimising emissions",
-        y_label="TTT [h]",
-        budgets=config_file["total_budget"],
-        base_name="ttt",
-        weights={"individual_tt": 0, "individual_emissions": 1},
-    )
-
-    ut.plot_multiple_curves(
-        title="Minimising emissions",
-        y_label="Emissions [kg]",
-        budgets=config_file["total_budget"],
-        base_name="emissions",
-        weights={"individual_tt": 0, "individual_emissions": 1},
     )
 
 

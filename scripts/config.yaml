@@ -5,9 +5,9 @@ episodes: 500
 # Weight for Total Travel Time (TTT) of the network
 TTT_weight: 0
 # Weight for individual travel time of each agent
-individual_travel_time_weight: 0.5
+individual_travel_time_weight: 0.3
 # Weight for minimising individual emissions
-emissions_weight: 0.5
+emissions_weight: 0.7
 # Total emissions weight
 total_emissions_weight: 0
 
