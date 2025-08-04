@@ -7,7 +7,7 @@ def plot_multiple_budgets(config_file: dict) -> None:
     """
     Plot curves with different budgets.
 
-    :param config: Dictionary of metric parameters (e.g., budget).
+    :param config_file: Dictionary of metric parameters (e.g., budget).
     """
     ttt_y_label = "TTT [h]"
     emissions_y_label = "Emissions [kg]"
@@ -57,6 +57,22 @@ def plot_multiple_budgets(config_file: dict) -> None:
         budgets=config_file["total_budget"],
         base_name="emissions",
         weights={"individual_tt": 0.5, "individual_emissions": 0.5},
+    )
+
+    ut.plot_multiple_curves(
+        title="Multiobjective reward",
+        y_label=ttt_y_label,
+        budgets=config_file["total_budget"],
+        base_name="ttt",
+        weights={"individual_tt": 0.25, "individual_emissions": 0.75},
+    )
+
+    ut.plot_multiple_curves(
+        title="Multiobjective reward",
+        y_label=emissions_y_label,
+        budgets=config_file["total_budget"],
+        base_name="emissions",
+        weights={"individual_tt": 0.25, "individual_emissions": 0.75},
     )
 
 

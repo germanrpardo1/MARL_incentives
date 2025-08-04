@@ -150,6 +150,33 @@ def initialise_q_function_incentives(actions_costs: dict) -> dict:
     }
 
 
+def route_selection_strategy(costs: list, strategy: str = "argmin") -> int:
+    """
+    Select the strategy for route selection when there is no budget left.
+
+    :param costs: Costs corresponding to all the routes of a given trip_id.
+    :param strategy: Strategy used to select routes.
+    :return: Route index.
+    """
+
+    costs = np.array(costs)
+
+    if strategy == "argmin":
+        return int(np.argmin(costs))
+
+    if strategy == "prob_distribution":
+        probs = costs / np.sum(costs)
+        return int(_rng.choice(len(costs), p=probs))
+
+    if strategy == "logit":
+        # Inverse utility (lower cost -> higher probability)
+        exp_utilities = np.exp(-costs / max(costs))
+        probs = exp_utilities / np.sum(exp_utilities)
+        return int(_rng.choice(len(costs), p=probs))
+
+    raise ValueError(f"Unknown strategy: {strategy}")
+
+
 def policy_no_incentives(
     trips_id: list, q: dict, actions_costs: dict, epsilon: float
 ) -> tuple[dict, dict]:
@@ -182,33 +209,6 @@ def policy_no_incentives(
         actions_index[trip_id] = selected_index
 
     return route_edges, actions_index
-
-
-def route_selection_strategy(costs: list, strategy: str = "argmin") -> int:
-    """
-    Select the strategy for route selection when there is no budget left.
-
-    :param costs: Costs corresponding to all the routes of a given trip_id.
-    :param strategy: Strategy used to select routes.
-    :return: Route index.
-    """
-
-    costs = np.array(costs)
-
-    if strategy == "argmin":
-        return int(np.argmin(costs))
-
-    if strategy == "prob_distribution":
-        probs = costs / np.sum(costs)
-        return int(_rng.choice(len(costs), p=probs))
-
-    if strategy == "logit":
-        # Inverse utility (lower cost -> higher probability)
-        exp_utilities = np.exp(-costs / max(costs))
-        probs = exp_utilities / np.sum(exp_utilities)
-        return int(_rng.choice(len(costs), p=probs))
-
-    raise ValueError(f"Unknown strategy: {strategy}")
 
 
 def policy_incentives(
@@ -274,7 +274,7 @@ def policy_function(incentives_mode: bool, **kwargs: Any) -> tuple[dict, dict]:
     if incentives_mode:
         return policy_incentives(**kwargs)
 
-    # Remove total_budget if it exists (safe removal)
+    # Remove total_budget and strategy if they exist
     kwargs.pop("total_budget", None)
     kwargs.pop("strategy", None)
     return policy_no_incentives(**kwargs)
