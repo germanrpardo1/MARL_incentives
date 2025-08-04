@@ -69,9 +69,10 @@ def plot_multiple_curves(
     title: str,
     y_label: str,
     budgets: list,
+    weights: dict,
+    base_name: str,
+    baseline_path: str,
     window_size: int = 30,
-    base_name: str = "emissions",
-    weights: dict = {"individual_tt": 0, "individual_emissions": 1},
     ext: str = "pdf",
 ) -> None:
     """
@@ -80,12 +81,12 @@ def plot_multiple_curves(
     :param title: Title of the plot.
     :param y_label: Label for the Y-axis.
     :param budgets: List of budget values to plot.
-    :param window_size: Size of the smoothing window.
     :param base_name: Metric name used in file naming and path creation.
     :param weights: Weight dictionary used in file naming.
+    :param baseline_path: Path to the baseline file.
+    :param window_size: Size of the smoothing window.
     :param ext: Extension for saved plot file (e.g., 'pdf' or 'png').
     """
-
     for budget in budgets:
         file_path = make_file_paths(
             base_name=base_name,
@@ -109,6 +110,15 @@ def plot_multiple_curves(
         )
         x = np.arange(actual_window - 1, len(arr))
         plt.plot(x, smoothed, label=f"Budget {budget}", linewidth=2)
+
+    with open(baseline_path, "rb") as f:
+        values = pickle.load(f)
+
+    arr = np.array(values)[0:500] / 1000
+    actual_window = min(window_size, len(arr))
+    smoothed = np.convolve(arr, np.ones(actual_window) / actual_window, mode="valid")
+    x = np.arange(actual_window - 1, len(arr))
+    plt.plot(x, smoothed, label="Baseline", linewidth=2)
 
     plt.legend()
     plt.title(title)
