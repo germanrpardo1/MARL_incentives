@@ -114,7 +114,9 @@ def plot_multiple_curves(
     with open(baseline_path, "rb") as f:
         values = pickle.load(f)
 
-    arr = np.array(values)[0:500] / 1000
+    arr = np.array(values)[0:500]
+    if base_name == "emissions":
+        arr /= 1000
     actual_window = min(window_size, len(arr))
     smoothed = np.convolve(arr, np.ones(actual_window) / actual_window, mode="valid")
     x = np.arange(actual_window - 1, len(arr))
@@ -139,6 +141,97 @@ def plot_multiple_curves(
     # Make sure the directory exists
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
+    plt.savefig(save_path, format=ext, bbox_inches="tight")
+    plt.close()
+
+
+def plot_weight_sensitivity(
+    weights_list: list,
+    budgets: list,
+    ttt_base_name: str,
+    emissions_base_name: str,
+    ttt_baseline_path: str,
+    emissions_baseline_path: str,
+    window_size: int = 50,
+    ext: str = "pdf",
+    save_path: str = "results/plots/weight_sensitivity.pdf",
+):
+    """
+    Plots the mean of the last N values for both TTT and emissions across different weights.
+    Uses a secondary y-axis for emissions due to different magnitude.
+    """
+    ttt_means = []
+    emissions_means = []
+    x_labels = []
+
+    for weights in weights_list:
+        weight_tt = weights.get("individual_tt", 0)
+        weight_em = weights.get("individual_emissions", 0)
+
+        budget = budgets[0]
+
+        # --- TTT ---
+        ttt_path = make_file_paths(
+            base_name=ttt_base_name,
+            subfolder="pickle_files",
+            budget=budget,
+            weights=weights,
+            ext="pkl",
+        )
+        if not os.path.exists(ttt_path):
+            print(f"Missing TTT file for weights {weights}")
+            continue
+
+        with open(ttt_path, "rb") as f:
+            ttt_values = np.array(pickle.load(f))
+        ttt_mean = np.mean(ttt_values[-window_size:])
+        ttt_means.append(ttt_mean)
+
+        # --- Emissions ---
+        em_path = make_file_paths(
+            base_name=emissions_base_name,
+            subfolder="pickle_files",
+            budget=budget,
+            weights=weights,
+            ext="pkl",
+        )
+        if not os.path.exists(em_path):
+            print(f"Missing emissions file for weights {weights}")
+            continue
+
+        with open(em_path, "rb") as f:
+            em_values = np.array(pickle.load(f))
+        em_mean = np.mean(em_values[-window_size:])
+        emissions_means.append(em_mean)
+
+        x_labels.append(f"{weight_tt:.2f}/{weight_em:.2f}")
+
+    # Plotting
+    fig, ax1 = plt.subplots(figsize=(8, 5))
+    ax2 = ax1.twinx()
+
+    ax1.plot(
+        x_labels, ttt_means, marker="o", label="TTT", color="tab:blue", linewidth=2
+    )
+    ax2.plot(
+        x_labels,
+        emissions_means,
+        marker="s",
+        label="Emissions",
+        color="tab:orange",
+        linewidth=2,
+    )
+
+    ax1.set_xlabel("Weights (TTT / Emissions)")
+    ax1.set_ylabel("TTT", color="tab:blue")
+    ax2.set_ylabel("Emissions", color="tab:orange")
+
+    ax1.tick_params(axis="y", labelcolor="tab:blue")
+    ax2.tick_params(axis="y", labelcolor="tab:orange")
+
+    plt.title("Weight Sensitivity Analysis")
+    fig.tight_layout()
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
     plt.savefig(save_path, format=ext, bbox_inches="tight")
     plt.close()
 

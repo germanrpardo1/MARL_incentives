@@ -21,7 +21,6 @@ alpha: 0.1
 incentives_mode: true
 # Total available budget for incentives or policies (can be used as a constraint)
 total_budget:
-  - 0
   - 50000
   - 100000000
 # Select route selection strategy
