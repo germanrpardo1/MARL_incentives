@@ -150,16 +150,53 @@ def plot_weight_sensitivity(
     budgets: list,
     ttt_base_name: str,
     emissions_base_name: str,
-    ttt_baseline_path: str,
-    emissions_baseline_path: str,
-    window_size: int = 50,
+    window_size: int = 100,
     ext: str = "pdf",
     save_path: str = "results/plots/weight_sensitivity.pdf",
 ):
     """
     Plots the mean of the last N values for both TTT and emissions across different weights.
     Uses a secondary y-axis for emissions due to different magnitude.
+
+    :param weights_list: List of dictionaries, each representing weight combinations with keys
+                         like 'individual_tt' and 'individual_emissions'.
+    :param budgets: List of budgets. Only the second budget (index 1) is used for plotting.
+    :param ttt_base_name: Base filename used to locate TTT data files.
+    :param emissions_base_name: Base filename used to locate emissions data files.
+    :param window_size: Number of final values to consider when computing the mean. Default is 100.
+    :param ext: File extension for the saved plot. Default is 'pdf'.
+    :param save_path: File path to save the generated plot. Default is 'results/plots/weight_sensitivity.pdf'.
     """
+
+    def load_mean_from_pickle(
+        base_name: str, weights: dict, budget, label: str
+    ) -> float | None:
+        """
+        Helper function to load the mean of the last `window_size` entries from a pickle file.
+
+        :param base_name: Base file name to use in path construction.
+        :param weights: Dictionary of weights used in path construction.
+        :param budget: Budget value to use in path construction.
+        :param label: Label for error reporting (e.g., 'TTT' or 'emissions').
+        :return: Mean of the last `window_size` entries in the data, or None if file is missing.
+        """
+        path = make_file_paths(
+            base_name=base_name,
+            subfolder="pickle_files",
+            budget=budget,
+            weights=weights,
+            ext="pkl",
+        )
+
+        if not os.path.exists(path):
+            print(f"Missing {label} file for weights {weights}")
+            return None
+
+        with open(path, "rb") as f:
+            values = np.array(pickle.load(f))
+
+        return float(np.mean(values[-window_size:]))
+
     ttt_means = []
     emissions_means = []
     x_labels = []
@@ -167,46 +204,22 @@ def plot_weight_sensitivity(
     for weights in weights_list:
         weight_tt = weights.get("individual_tt", 0)
         weight_em = weights.get("individual_emissions", 0)
+        budget = budgets[1]
 
-        budget = budgets[0]
-
-        # --- TTT ---
-        ttt_path = make_file_paths(
-            base_name=ttt_base_name,
-            subfolder="pickle_files",
-            budget=budget,
-            weights=weights,
-            ext="pkl",
+        ttt_mean = load_mean_from_pickle(ttt_base_name, weights, budget, "TTT")
+        em_mean = load_mean_from_pickle(
+            emissions_base_name, weights, budget, "emissions"
         )
-        if not os.path.exists(ttt_path):
-            print(f"Missing TTT file for weights {weights}")
+
+        # Skip if either dataset is missing
+        if ttt_mean is None or em_mean is None:
             continue
 
-        with open(ttt_path, "rb") as f:
-            ttt_values = np.array(pickle.load(f))
-        ttt_mean = np.mean(ttt_values[-window_size:])
         ttt_means.append(ttt_mean)
-
-        # --- Emissions ---
-        em_path = make_file_paths(
-            base_name=emissions_base_name,
-            subfolder="pickle_files",
-            budget=budget,
-            weights=weights,
-            ext="pkl",
-        )
-        if not os.path.exists(em_path):
-            print(f"Missing emissions file for weights {weights}")
-            continue
-
-        with open(em_path, "rb") as f:
-            em_values = np.array(pickle.load(f))
-        em_mean = np.mean(em_values[-window_size:])
         emissions_means.append(em_mean)
-
         x_labels.append(f"{weight_tt:.2f}/{weight_em:.2f}")
 
-    # Plotting
+    # --- Plotting ---
     fig, ax1 = plt.subplots(figsize=(8, 5))
     ax2 = ax1.twinx()
 
@@ -231,6 +244,7 @@ def plot_weight_sensitivity(
 
     plt.title("Weight Sensitivity Analysis")
     fig.tight_layout()
+
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     plt.savefig(save_path, format=ext, bbox_inches="tight")
     plt.close()

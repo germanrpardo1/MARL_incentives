@@ -11,6 +11,9 @@ def plot_multiple_budgets(config_file: dict) -> None:
     """
     ttt_y_label = "TTT [h]"
     emissions_y_label = "Emissions [kg]"
+    dua_iterate_emissions = "results/pickle_files/emissions/duaIterate_emissions.pkl"
+    dua_iterate_time = "results/pickle_files/ttt/duaIterate_time.pkl"
+    title_multi_obj = "Multiobjective reward"
 
     ut.plot_multiple_curves(
         title="Minimising travel time",
@@ -18,7 +21,7 @@ def plot_multiple_budgets(config_file: dict) -> None:
         budgets=config_file["total_budget"],
         base_name="ttt",
         weights={"individual_tt": 1, "individual_emissions": 0},
-        baseline_path="results/pickle_files/ttt/duaIterate_time.pkl",
+        baseline_path=dua_iterate_time,
     )
 
     ut.plot_multiple_curves(
@@ -27,61 +30,61 @@ def plot_multiple_budgets(config_file: dict) -> None:
         budgets=config_file["total_budget"],
         base_name="emissions",
         weights={"individual_tt": 1, "individual_emissions": 0},
-        baseline_path="results/pickle_files/emissions/duaIterate_emissions.pkl",
+        baseline_path=dua_iterate_emissions,
     )
 
     ut.plot_multiple_curves(
-        title="Multiobjective reward",
+        title=title_multi_obj,
         y_label=ttt_y_label,
         budgets=config_file["total_budget"],
         base_name="ttt",
         weights={"individual_tt": 0.75, "individual_emissions": 0.25},
-        baseline_path="results/pickle_files/ttt/duaIterate_time.pkl",
+        baseline_path=dua_iterate_time,
     )
 
     ut.plot_multiple_curves(
-        title="Multiobjective reward",
+        title=title_multi_obj,
         y_label=emissions_y_label,
         budgets=config_file["total_budget"],
         base_name="emissions",
         weights={"individual_tt": 0.75, "individual_emissions": 0.25},
-        baseline_path="results/pickle_files/emissions/duaIterate_emissions.pkl",
+        baseline_path=dua_iterate_emissions,
     )
 
     ut.plot_multiple_curves(
-        title="Multiobjective reward",
+        title=title_multi_obj,
         y_label=ttt_y_label,
         budgets=config_file["total_budget"],
         base_name="ttt",
         weights={"individual_tt": 0.5, "individual_emissions": 0.5},
-        baseline_path="results/pickle_files/ttt/duaIterate_time.pkl",
+        baseline_path=dua_iterate_time,
     )
 
     ut.plot_multiple_curves(
-        title="Multiobjective reward",
+        title=title_multi_obj,
         y_label=emissions_y_label,
         budgets=config_file["total_budget"],
         base_name="emissions",
         weights={"individual_tt": 0.5, "individual_emissions": 0.5},
-        baseline_path="results/pickle_files/emissions/duaIterate_emissions.pkl",
+        baseline_path=dua_iterate_emissions,
     )
 
     ut.plot_multiple_curves(
-        title="Multiobjective reward",
+        title=title_multi_obj,
         y_label=ttt_y_label,
         budgets=config_file["total_budget"],
         base_name="ttt",
         weights={"individual_tt": 0.25, "individual_emissions": 0.75},
-        baseline_path="results/pickle_files/ttt/duaIterate_time.pkl",
+        baseline_path=dua_iterate_time,
     )
 
     ut.plot_multiple_curves(
-        title="Multiobjective reward",
+        title=title_multi_obj,
         y_label=emissions_y_label,
         budgets=config_file["total_budget"],
         base_name="emissions",
         weights={"individual_tt": 0.25, "individual_emissions": 0.75},
-        baseline_path="results/pickle_files/emissions/duaIterate_emissions.pkl",
+        baseline_path=dua_iterate_emissions,
     )
 
     ut.plot_multiple_curves(
@@ -90,7 +93,7 @@ def plot_multiple_budgets(config_file: dict) -> None:
         budgets=config_file["total_budget"],
         base_name="ttt",
         weights={"individual_tt": 0, "individual_emissions": 1},
-        baseline_path="results/pickle_files/ttt/duaIterate_time.pkl",
+        baseline_path=dua_iterate_time,
     )
 
     ut.plot_multiple_curves(
@@ -99,7 +102,7 @@ def plot_multiple_budgets(config_file: dict) -> None:
         budgets=config_file["total_budget"],
         base_name="emissions",
         weights={"individual_tt": 0, "individual_emissions": 1},
-        baseline_path="results/pickle_files/emissions/duaIterate_emissions.pkl",
+        baseline_path=dua_iterate_emissions,
     )
     weights_list = [
         {"individual_tt": 1, "individual_emissions": 0},
@@ -114,9 +117,6 @@ def plot_multiple_budgets(config_file: dict) -> None:
         budgets=config_file["total_budget"],
         ttt_base_name="ttt",
         emissions_base_name="emissions",
-        ttt_baseline_path="results/pickle_files/ttt/duaIterate_time.pkl",
-        emissions_baseline_path="results/pickle_files/emissions/duaIterate_emissions.pkl",
-        window_size=50,
         save_path="results/plots/weight_sensitivity.pdf",
     )
 
