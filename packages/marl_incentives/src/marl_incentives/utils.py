@@ -3,13 +3,14 @@
 import os
 import pickle
 import sys
+from typing import Dict, List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
 import yaml
 
 
-def load_config(path: str = "scripts/config.yaml") -> dict:
+def load_config(path: str = "scripts/config_file.yaml") -> dict:
     """
     Load configuration file.
 
@@ -65,18 +66,54 @@ def save_plot_and_file(
         pickle.dump(values, f)
 
 
+def smooth_curve(values: np.ndarray, window_size: int) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Smooth a 1D array using a moving average.
+
+    :param values: Input array of values.
+    :param window_size: Smoothing window size.
+    :return: (x, smoothed values)
+    """
+    if len(values) == 0:
+        return np.array([]), np.array([])
+
+    actual_window = min(window_size, len(values))
+    smoothed = np.convolve(values, np.ones(actual_window) / actual_window, mode="valid")
+    x = np.arange(actual_window - 1, len(values))
+    return x, smoothed
+
+
+def load_pickle_array(path: str) -> Optional[np.ndarray]:
+    """
+    Load a numpy array from a pickle file.
+
+    :param path: Path to the pickle file.
+    :return: Numpy array or None if file missing.
+    """
+    if not os.path.exists(path):
+        print(f"[WARN] File not found: {path}")
+        return None
+
+    with open(path, "rb") as f:
+        try:
+            return np.array(pickle.load(f))
+        except Exception as e:
+            print(f"[ERROR] Failed to load pickle file {path}: {e}")
+            return None
+
+
 def plot_multiple_curves(
     title: str,
     y_label: str,
-    budgets: list,
-    weights: dict,
+    budgets: List[int],
+    weights: Dict,
     base_name: str,
     baseline_path: str,
     window_size: int = 30,
     ext: str = "pdf",
 ) -> None:
     """
-    Plot smoothed curves from multiple budgets by reading values from pickle files and save the plot.
+    Plot smoothed curves from multiple budgets and a baseline.
 
     :param title: Title of the plot.
     :param y_label: Label for the Y-axis.
@@ -87,6 +124,9 @@ def plot_multiple_curves(
     :param window_size: Size of the smoothing window.
     :param ext: Extension for saved plot file (e.g., 'pdf' or 'png').
     """
+    plt.figure(figsize=(8, 5))
+
+    # Plot curves for each budget
     for budget in budgets:
         file_path = make_file_paths(
             base_name=base_name,
@@ -96,38 +136,30 @@ def plot_multiple_curves(
             ext="pkl",
         )
 
-        if not os.path.exists(file_path):
-            print(f"File not found: {file_path}")
+        values = load_pickle_array(file_path)
+        if values is None:
             continue
 
-        with open(file_path, "rb") as f:
-            values = pickle.load(f)
+        x, smoothed = smooth_curve(values, window_size)
+        _label = f"Budget {budget}" if budget != 100000000 else "Unlimited budget"
+        plt.plot(x, smoothed, label=_label, linewidth=2)
 
-        arr = np.array(values)
-        actual_window = min(window_size, len(arr))
-        smoothed = np.convolve(
-            arr, np.ones(actual_window) / actual_window, mode="valid"
-        )
-        x = np.arange(actual_window - 1, len(arr))
-        plt.plot(x, smoothed, label=f"Budget {budget}", linewidth=2)
+    # Plot baseline
+    baseline_values = load_pickle_array(baseline_path)
+    if baseline_values is not None:
+        baseline_values = baseline_values[:500]
+        if base_name == "emissions":
+            baseline_values /= 1000
+        x, smoothed = smooth_curve(baseline_values, window_size)
+        plt.plot(x, smoothed, label="Baseline", linewidth=2)
 
-    with open(baseline_path, "rb") as f:
-        values = pickle.load(f)
-
-    arr = np.array(values)[0:500]
-    if base_name == "emissions":
-        arr /= 1000
-    actual_window = min(window_size, len(arr))
-    smoothed = np.convolve(arr, np.ones(actual_window) / actual_window, mode="valid")
-    x = np.arange(actual_window - 1, len(arr))
-    plt.plot(x, smoothed, label="Baseline", linewidth=2)
-
+    # Finalize plot
     plt.legend()
     plt.title(title)
     plt.xlabel("Episodes")
     plt.ylabel(y_label)
 
-    # Use first budget to build save path
+    # Save
     save_path = make_file_paths(
         base_name=base_name,
         subfolder="plots",
@@ -136,50 +168,41 @@ def plot_multiple_curves(
         ext=ext,
     )
     if os.path.exists(save_path):
+        print(f"[INFO] Plot already exists, skipping: {save_path}")
         plt.close()
         return
-    # Make sure the directory exists
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
     plt.savefig(save_path, format=ext, bbox_inches="tight")
     plt.close()
+    print(f"[INFO] Saved plot: {save_path}")
 
 
 def plot_weight_sensitivity(
-    weights_list: list,
-    budgets: list,
+    weights_list: List[Dict],
+    budgets: List[int],
     ttt_base_name: str,
     emissions_base_name: str,
     window_size: int = 100,
     ext: str = "pdf",
     save_path: str = "results/plots/weight_sensitivity.pdf",
-):
+) -> None:
     """
-    Plots the mean of the last N values for both TTT and emissions across different weights.
-    Uses a secondary y-axis for emissions due to different magnitude.
+    Plot mean TTT and emissions sensitivity across different weight configs.
 
-    :param weights_list: List of dictionaries, each representing weight combinations with keys
-                         like 'individual_tt' and 'individual_emissions'.
-    :param budgets: List of budgets. Only the second budget (index 1) is used for plotting.
-    :param ttt_base_name: Base filename used to locate TTT data files.
-    :param emissions_base_name: Base filename used to locate emissions data files.
-    :param window_size: Number of final values to consider when computing the mean. Default is 100.
-    :param ext: File extension for the saved plot. Default is 'pdf'.
-    :param save_path: File path to save the generated plot. Default is 'results/plots/weight_sensitivity.pdf'.
+    :param weights_list: List of weight dictionaries (e.g., {'individual_tt': x, 'individual_emissions': y}).
+    :param budgets: List of budgets. Uses the last budget.
+    :param ttt_base_name: Base filename for TTT pickle files.
+    :param emissions_base_name: Base filename for emissions pickle files.
+    :param window_size: Number of final values to average.
+    :param ext: File extension for the saved plot.
+    :param save_path: Path to save the plot.
     """
 
-    def load_mean_from_pickle(
-        base_name: str, weights: dict, budget, label: str
-    ) -> float | None:
-        """
-        Helper function to load the mean of the last `window_size` entries from a pickle file.
-
-        :param base_name: Base file name to use in path construction.
-        :param weights: Dictionary of weights used in path construction.
-        :param budget: Budget value to use in path construction.
-        :param label: Label for error reporting (e.g., 'TTT' or 'emissions').
-        :return: Mean of the last `window_size` entries in the data, or None if file is missing.
-        """
+    def compute_mean(
+        base_name: str, weights: Dict, budget: int, label: str
+    ) -> Optional[float]:
+        """Helper to compute the mean of the last window_size entries from a pickle file."""
         path = make_file_paths(
             base_name=base_name,
             subfolder="pickle_files",
@@ -187,60 +210,55 @@ def plot_weight_sensitivity(
             weights=weights,
             ext="pkl",
         )
-
-        if not os.path.exists(path):
-            print(f"Missing {label} file for weights {weights}")
+        values = load_pickle_array(path)
+        if values is None:
+            print(f"[WARN] Missing {label} data for weights {weights}")
             return None
-
-        with open(path, "rb") as f:
-            values = np.array(pickle.load(f))
-
         return float(np.mean(values[-window_size:]))
 
-    ttt_means = []
-    emissions_means = []
-    x_labels = []
+    budget = budgets[-1]
+    ttt_means, emissions_means, x_labels = [], [], []
 
     for weights in weights_list:
-        weight_tt = weights.get("individual_tt", 0)
-        weight_em = weights.get("individual_emissions", 0)
-        budget = budgets[1]
+        ttt_mean = compute_mean(ttt_base_name, weights, budget, "TTT")
+        emissions_mean = compute_mean(emissions_base_name, weights, budget, "emissions")
 
-        ttt_mean = load_mean_from_pickle(ttt_base_name, weights, budget, "TTT")
-        em_mean = load_mean_from_pickle(
-            emissions_base_name, weights, budget, "emissions"
-        )
-
-        # Skip if either dataset is missing
-        if ttt_mean is None or em_mean is None:
+        if ttt_mean is None or emissions_mean is None:
             continue
 
         ttt_means.append(ttt_mean)
-        emissions_means.append(em_mean)
-        x_labels.append(f"{weight_tt:.2f}/{weight_em:.2f}")
+        emissions_means.append(emissions_mean)
 
-    # --- Plotting ---
+        wt_tt = weights.get("individual_tt", 0.0)
+        wt_em = weights.get("individual_emissions", 0.0)
+        x_labels.append(f"{wt_tt:.2f}/{wt_em:.2f}")
+
+    if not ttt_means or not emissions_means:
+        print("[WARN] No valid data found for weight sensitivity plot.")
+        return
+
+    # Plot
     fig, ax1 = plt.subplots(figsize=(8, 5))
     ax2 = ax1.twinx()
 
-    ax1.plot(
-        x_labels, ttt_means, marker="o", label="TTT", color="tab:blue", linewidth=2
-    )
+    blue = "tab:blue"
+    ax1.plot(x_labels, ttt_means, marker="o", label="TTT", color=blue, linewidth=2)
+    orange = "tab:orange"
     ax2.plot(
         x_labels,
         emissions_means,
         marker="s",
         label="Emissions",
-        color="tab:orange",
+        color=orange,
         linewidth=2,
     )
 
     ax1.set_xlabel("Weights (TTT / Emissions)")
-    ax1.set_ylabel("TTT", color="tab:blue")
-    ax2.set_ylabel("Emissions", color="tab:orange")
+    ax1.set_ylabel("TTT", color=blue)
+    ax2.set_ylabel("Emissions", color=orange)
 
-    ax1.tick_params(axis="y", labelcolor="tab:blue")
-    ax2.tick_params(axis="y", labelcolor="tab:orange")
+    ax1.tick_params(axis="y", labelcolor=blue)
+    ax2.tick_params(axis="y", labelcolor=orange)
 
     plt.title("Weight Sensitivity Analysis")
     fig.tight_layout()
@@ -248,6 +266,7 @@ def plot_weight_sensitivity(
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     plt.savefig(save_path, format=ext, bbox_inches="tight")
     plt.close()
+    print(f"[INFO] Saved plot: {save_path}")
 
 
 def log_progress(

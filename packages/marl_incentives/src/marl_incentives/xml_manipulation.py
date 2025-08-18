@@ -91,7 +91,7 @@ def write_sumo_config(
 
 def write_edge_data_config(filename: str, weights_path: str, freq: int) -> None:
     """
-    Write config for edge data granularity.
+    Write config_file for edge data granularity.
 
     :param filename: Path to the output file.
     :param weights_path: Path to the weights file.

@@ -1,0 +1,29 @@
+# Total available budget for incentives or policies (can be used as a constraint)
+total_budget:
+  - 50000
+  - 100000000
+
+# Paths to required data files and output locations
+paths:
+  dua_iterate_emissions: "results/pickle_files/emissions/duaIterate_emissions.pkl"
+  dua_iterate_time: "results/pickle_files/ttt/duaIterate_time.pkl"
+  weight_sensitivity_plot: "results/plots/weight_sensitivity.pdf"
+
+# Weight configurations for trade-offs between travel time and emissions
+weights:
+  - {individual_tt: 1, individual_emissions: 0}
+  - {individual_tt: 0.75, individual_emissions: 0.25}
+  - {individual_tt: 0.5, individual_emissions: 0.5}
+  - {individual_tt: 0.25, individual_emissions: 0.75}
+  - {individual_tt: 0, individual_emissions: 1}
+
+# Plot labels for axes
+labels:
+  ttt: "TTT [h]"
+  emissions: "Emissions [kg]"
+
+# Titles for plots
+titles:
+  time: "Minimising travel time"
+  emissions: "Minimising emissions"
+  multi: "Multiobjective reward"
