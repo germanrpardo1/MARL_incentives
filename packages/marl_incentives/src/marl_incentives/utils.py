@@ -185,7 +185,7 @@ def plot_weight_sensitivity(
     emissions_base_name: str,
     window_size: int = 100,
     ext: str = "pdf",
-    save_path: str = "results/plots/weight_sensitivity.pdf",
+    save_path: str = "results/plots/weight_sensitivity",
 ) -> None:
     """
     Plot mean TTT and emissions sensitivity across different weight configs.
@@ -198,6 +198,7 @@ def plot_weight_sensitivity(
     :param ext: File extension for the saved plot.
     :param save_path: Path to save the plot.
     """
+    save_path += "." + ext
 
     def compute_mean(
         base_name: str, weights: Dict, budget: int, label: str

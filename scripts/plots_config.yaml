@@ -3,6 +3,15 @@ total_budget:
   - 50000
   - 100000000
 
+# Window size for running average sensitivity
+window_size_sensitivity: 100
+
+# Window size for running average
+window_size: 30
+
+# Plots file extension
+files_extension: "png"
+
 # Paths to required data files and output locations
 paths:
   dua_iterate_emissions: "results/pickle_files/emissions/duaIterate_emissions.pkl"

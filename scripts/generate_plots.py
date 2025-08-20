@@ -1,11 +1,9 @@
 """This script generates the plots."""
 
-from typing import Dict, List
-
 import marl_incentives.utils as ut
 
 
-def plot_multiple_budgets(config_file: Dict) -> None:
+def plot_multiple_budgets(config_file: dict) -> None:
     """
     Plot curves with different budgets for travel time and emissions.
 
@@ -16,13 +14,16 @@ def plot_multiple_budgets(config_file: Dict) -> None:
         - labels: dict of axis labels
         - titles: dict of plot titles
     """
-    budgets: List[int] = config_file["total_budget"]
-    paths: Dict[str, str] = config_file["paths"]
-    weights_list: List[Dict[str, float]] = config_file["weights"]
-    labels: Dict[str, str] = config_file["labels"]
-    titles: Dict[str, str] = config_file["titles"]
+    budgets: list[int] = config_file["total_budget"]
+    paths: dict[str, str] = config_file["paths"]
+    weights_list: list[dict[str, float]] = config_file["weights"]
+    labels: dict[str, str] = config_file["labels"]
+    titles: dict[str, str] = config_file["titles"]
+    files_extension: str = config_file["files_extension"]
+    window_size_sensitivity: int = config_file["window_size_sensitivity"]
+    window_size: int = config_file["window_size"]
 
-    def plot_curve_set(title: str, weights: Dict[str, float]) -> None:
+    def plot_curve_set(title: str, weights: dict[str, float]) -> None:
         """Helper to plot both TTT and emissions curves with given weights."""
         ut.plot_multiple_curves(
             title=title,
@@ -31,6 +32,8 @@ def plot_multiple_budgets(config_file: Dict) -> None:
             base_name="ttt",
             weights=weights,
             baseline_path=paths["dua_iterate_time"],
+            window_size=window_size,
+            ext=files_extension,
         )
         ut.plot_multiple_curves(
             title=title,
@@ -39,6 +42,8 @@ def plot_multiple_budgets(config_file: Dict) -> None:
             base_name="emissions",
             weights=weights,
             baseline_path=paths["dua_iterate_emissions"],
+            window_size=window_size,
+            ext=files_extension,
         )
 
     # Plot single-objective and multi-objective cases
@@ -54,6 +59,8 @@ def plot_multiple_budgets(config_file: Dict) -> None:
         ttt_base_name="ttt",
         emissions_base_name="emissions",
         save_path=paths["weight_sensitivity_plot"],
+        ext=files_extension,
+        window_size=window_size_sensitivity,
     )
 
 
