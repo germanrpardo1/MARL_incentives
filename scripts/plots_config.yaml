@@ -16,7 +16,7 @@ files_extension: "png"
 paths:
   dua_iterate_emissions: "results/pickle_files/emissions/duaIterate_emissions.pkl"
   dua_iterate_time: "results/pickle_files/ttt/duaIterate_time.pkl"
-  weight_sensitivity_plot: "results/plots/weight_sensitivity.pdf"
+  weight_sensitivity_plot: "results/plots/weight_sensitivity"
 
 # Weight configurations for trade-offs between travel time and emissions
 weights:
@@ -28,11 +28,11 @@ weights:
 
 # Plot labels for axes
 labels:
-  ttt: "TTT [h]"
-  emissions: "Emissions [kg]"
+  ttt: "Total Travel Time [h]"
+  emissions: "CO2 Emissions [kg]"
 
 # Titles for plots
 titles:
-  time: "Minimising travel time"
-  emissions: "Minimising emissions"
+  time: "Objective: Minimise travel time"
+  emissions: "Objective: Minimise emissions"
   multi: "Multiobjective reward"

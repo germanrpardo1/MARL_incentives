@@ -155,9 +155,9 @@ def plot_multiple_curves(
 
     # Finalize plot
     plt.legend()
-    plt.title(title)
-    plt.xlabel("Episodes")
-    plt.ylabel(y_label)
+    plt.title(title, fontsize=13)
+    plt.xlabel("Episodes", fontsize=13)
+    plt.ylabel(y_label, fontsize=13)
 
     # Save
     save_path = make_file_paths(
@@ -249,19 +249,19 @@ def plot_weight_sensitivity(
         x_labels,
         emissions_means,
         marker="s",
-        label="Emissions",
+        label="CO2 Emissions [kg]",
         color=orange,
         linewidth=2,
     )
 
-    ax1.set_xlabel("Weights (TTT / Emissions)")
-    ax1.set_ylabel("TTT", color=blue)
-    ax2.set_ylabel("Emissions", color=orange)
+    ax1.set_xlabel("Weights (TTT / Emissions)", fontsize=12)
+    ax1.set_ylabel("Total Travel Time [h]", color=blue, fontsize=12)
+    ax2.set_ylabel("CO2 Emissions [kg]", color=orange, fontsize=12)
 
     ax1.tick_params(axis="y", labelcolor=blue)
     ax2.tick_params(axis="y", labelcolor=orange)
 
-    plt.title("Weight Sensitivity Analysis")
+    plt.title("Weight Sensitivity Analysis", fontsize=13)
     fig.tight_layout()
 
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
