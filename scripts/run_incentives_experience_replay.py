@@ -1,7 +1,10 @@
 """This script runs the MARL algorithm with and without incentives."""
 
 import os
+import random
+from collections import deque
 
+import numpy as np
 from marl_incentives import environment as env
 from marl_incentives import traveller as tr
 from marl_incentives import utils as ut
@@ -45,6 +48,22 @@ def save_metric(
         path_to_pickle=pickle_path,
         path_to_plot=plot_path,
     )
+
+
+class ReplayBuffer:
+    def __init__(self, capacity=100):
+        self.buffer = deque(maxlen=capacity)
+
+    def push(self, action, reward):
+        self.buffer.append((action, reward))
+
+    def sample(self, batch_size):
+        batch = random.sample(self.buffer, batch_size)
+        actions, rewards = zip(*batch)
+        return np.array(actions), np.array(rewards)
+
+    def __len__(self):
+        return len(self.buffer)
 
 
 def main(config: dict, total_budget: int) -> None:
@@ -98,6 +117,8 @@ def main(config: dict, total_budget: int) -> None:
     # Instantiate network object
     network_env = env.Network(paths_dict=paths_dict, sumo_params=sumo_params)
 
+    # Initialise replay buffer
+    buffer = ReplayBuffer(capacity=episodes)
     # Train RL agent
     for i in range(episodes):
         # Select policy function based on whether incentives are used or not
@@ -117,22 +138,33 @@ def main(config: dict, total_budget: int) -> None:
             routes_edges=routes_edges,
         )
 
+        reward_tuple = [total_tt, ind_tt, ind_em, total_em]
+        buffer.push(actions_index, reward_tuple)
+
         # Record TTT and total emissions throughout iterations
         ttts.append(total_tt)
         emissions_total.append(total_em)
 
         # For each agent update Q function
         # Q(a) = (1 - alpha) * Q(a) + alpha * r
-        for trip in trips_id:
-            idx = actions_index[trip]
-            # Compute reward
-            reward = tr.compute_reward(
-                trip, ind_tt, ind_em, total_tt, total_em, weights
-            )
-            # Update Q-value
-            q_values[trip][idx] = (1 - hyperparams["alpha"]) * q_values[trip][
-                idx
-            ] + hyperparams["alpha"] * reward
+        batch_size = 32
+        updates_per_episode = 4
+        if len(buffer) >= batch_size:
+            for _ in range(updates_per_episode):
+                acts, rews = buffer.sample(batch_size)
+                for a, r in zip(acts, rews):
+                    actions_index = a
+                    total_tt, ind_tt, ind_em, total_em = r
+                    for trip in trips_id:
+                        idx = actions_index[trip]
+                        # Compute reward
+                        reward = tr.compute_reward(
+                            trip, ind_tt, ind_em, total_tt, total_em, weights
+                        )
+                        # Update Q-value
+                        q_values[trip][idx] = (1 - hyperparams["alpha"]) * q_values[
+                            trip
+                        ][idx] + hyperparams["alpha"] * reward
 
         # Logging
         ut.log_progress(i=i, episodes=episodes, hyperparams=hyperparams, ttts=ttts)
@@ -141,9 +173,6 @@ def main(config: dict, total_budget: int) -> None:
         hyperparams["epsilon"] = max(
             0.01, hyperparams["epsilon"] * hyperparams["decay"]
         )
-
-        # Retrieve updated route costs
-        # costs = calculate_route_cost(actions, parse_weights("data/weights.xml"))
 
     # Save the plot and pickle file for TTT and emissions
     save_metric(ttts, labels_dict, "ttt", "TTT [h]", total_budget, weights)
@@ -159,7 +188,7 @@ def main(config: dict, total_budget: int) -> None:
 
 if __name__ == "__main__":
     # Load config
-    config_file = ut.load_config(path="scripts/config.yaml")
+    config_file = ut.load_config(path="scripts/run_incentives_experience_replay.yaml")
 
     # Loop for different budgets
     for tot_budget in config_file["total_budget"]:
