@@ -118,7 +118,7 @@ def main(config: dict, total_budget: int) -> None:
     network_env = env.Network(paths_dict=paths_dict, sumo_params=sumo_params)
 
     # Initialise replay buffer
-    buffer = ReplayBuffer(capacity=episodes)
+    buffer = ReplayBuffer(capacity=100)
     # Train RL agent
     for i in range(episodes):
         # Select policy function based on whether incentives are used or not
@@ -148,38 +148,36 @@ def main(config: dict, total_budget: int) -> None:
         # For each agent update Q function
         # Q(a) = (1 - alpha) * Q(a) + alpha * r
         batch_size = 32
-        updates_per_episode = 4
         if len(buffer) >= batch_size:
-            for _ in range(updates_per_episode):
-                acts, rews = buffer.sample(batch_size)
-                for a, r in zip(acts, rews):
-                    actions_index = a
-                    total_tt, ind_tt, ind_em, total_em = r
-                    for trip in trips_id:
-                        idx = actions_index[trip]
-                        # Compute reward
-                        reward = tr.compute_reward(
-                            trip, ind_tt, ind_em, total_tt, total_em, weights
-                        )
-                        # Update Q-value
-                        q_values[trip][idx] = (1 - hyperparams["alpha"]) * q_values[
-                            trip
-                        ][idx] + hyperparams["alpha"] * reward
+            acts, rews = buffer.sample(batch_size)
+            for a, r in zip(acts, rews):
+                actions_index = a
+                total_tt, ind_tt, ind_em, total_em = r
+                for trip in trips_id:
+                    idx = actions_index[trip]
+                    # Compute reward
+                    reward = tr.compute_reward(
+                        trip, ind_tt, ind_em, total_tt, total_em, weights
+                    )
+                    # Update Q-value
+                    q_values[trip][idx] = (1 - hyperparams["alpha"]) * q_values[trip][
+                        idx
+                    ] + hyperparams["alpha"] * reward
+
+                # Reduce epsilon
+                hyperparams["epsilon"] = max(
+                    0.01, hyperparams["epsilon"] * hyperparams["decay"]
+                )
 
         # Logging
         ut.log_progress(i=i, episodes=episodes, hyperparams=hyperparams, ttts=ttts)
 
-        # Reduce epsilon
-        hyperparams["epsilon"] = max(
-            0.01, hyperparams["epsilon"] * hyperparams["decay"]
-        )
-
     # Save the plot and pickle file for TTT and emissions
-    save_metric(ttts, labels_dict, "ttt", "TTT [h]", total_budget, weights)
+    save_metric(ttts, labels_dict, "exp_replay_ttt", "TTT [h]", total_budget, weights)
     save_metric(
         emissions_total,
         labels_dict,
-        "emissions",
+        "exp_replay_emissions",
         "Emissions [kg]",
         total_budget,
         weights,
