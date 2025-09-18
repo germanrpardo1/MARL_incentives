@@ -10,22 +10,24 @@ from marl_incentives import xml_manipulation as xmlm
 
 
 class Network:
-    """Represents the network for the simulation."""
+    """Class that represents the network for the simulation."""
 
     def __init__(
         self,
         paths_dict: dict,
         sumo_params: dict,
-    ):
+        edge_data_frequency: int,
+    ) -> None:
         """
         Constructor method for the Network class.
 
         :param paths_dict: Dict of paths (routes file, edge data, emissions, etc.)
         :param sumo_params: SUMO simulation configuration
+        :param edge_data_frequency: Frequency of edge data (in seconds)
         """
-
         self.paths_dict = paths_dict
         self.sumo_params = sumo_params
+        self.edge_data_frequency = edge_data_frequency
 
     def run_simulation(self) -> None:
         """Run a SUMO simulation."""
@@ -41,7 +43,6 @@ class Network:
 
     def step(
         self,
-        edge_data_frequency: int,
         routes_edges: dict,
     ) -> tuple[float, dict, dict, float]:
         """
@@ -50,7 +51,6 @@ class Network:
         - Run the SUMO simulation
         - Process travel time and emission outputs
 
-        :param edge_data_frequency: Frequency of edge data (in seconds)
         :param routes_edges: Route edges for each trip_id
         :return: Tuple of (total travel time, normalised individual travel times,
                           normalised individual emissions, normalised total emissions)
@@ -60,7 +60,7 @@ class Network:
         xmlm.write_edge_data_config(
             self.paths_dict["edge_data_path"],
             self.paths_dict["edges_weights_path"],
-            edge_data_frequency,
+            self.edge_data_frequency,
         )
         xmlm.write_sumo_config(**self.sumo_params)
 

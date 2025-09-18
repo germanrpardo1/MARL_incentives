@@ -10,42 +10,51 @@ from cfgv import Array
 _rng = np.random.default_rng()
 
 
-def get_actions(file_path: str) -> dict:
-    """
-    Parse an XML file and extract available vehicle routes and their costs.
+class Drivers:
+    """Class that represents the drivers."""
 
-    :param file_path: Path to the XML file.
+    def __init__(self, actions_file_path: str) -> None:
+        """
+        Constructor method for the Driver class.
 
-    :return: A dictionary mapping vehicle IDs to lists of (index, edge list) tuples
-        and costs
-    """
-    tree = ET.parse(file_path)
-    root = tree.getroot()
+        :param actions_file_path: Path to the XML file.
+        """
+        self.actions_file_path = actions_file_path
 
-    vehicle_routes_and_costs = {}  # vehicle_id -> [(index, edges), costs]
-    vehicle_ids = []  # List of vehicle IDs
+    def get_actions(self) -> dict:
+        """
+        Parse an XML file and extract available vehicle routes and their costs.
 
-    # Loop through all the vehicles
-    for vehicle in root.findall("vehicle"):
-        # Get vehicle ID
-        vehicle_id = vehicle.get("id")
-        vehicle_ids.append(vehicle_id)
+        :return: A dictionary mapping vehicle IDs to lists of (index, edge list) tuples
+            and costs
+        """
+        tree = ET.parse(self.actions_file_path)
+        root = tree.getroot()
 
-        routes = []
-        costs = []
+        vehicle_routes_and_costs = {}  # vehicle_id -> [(index, edges), costs]
+        vehicle_ids = []  # List of vehicle IDs
 
-        route_distribution = vehicle.find("routeDistribution")
-        if route_distribution is not None:
-            # Loop through all routes for the given vehicle
-            for i, route in enumerate(route_distribution.findall("route")):
-                edge_list = route.get("edges", "").split()
-                cost = float(route.get("cost", "0"))
-                routes.append((i, edge_list))
-                costs.append(cost)
+        # Loop through all the vehicles
+        for vehicle in root.findall("vehicle"):
+            # Get vehicle ID
+            vehicle_id = vehicle.get("id")
+            vehicle_ids.append(vehicle_id)
 
-        vehicle_routes_and_costs[vehicle_id] = (routes, costs)
+            routes = []
+            costs = []
 
-    return vehicle_routes_and_costs
+            route_distribution = vehicle.find("routeDistribution")
+            if route_distribution is not None:
+                # Loop through all routes for the given vehicle
+                for i, route in enumerate(route_distribution.findall("route")):
+                    edge_list = route.get("edges", "").split()
+                    cost = float(route.get("cost", "0"))
+                    routes.append((i, edge_list))
+                    costs.append(cost)
+
+            vehicle_routes_and_costs[vehicle_id] = (routes, costs)
+
+        return vehicle_routes_and_costs
 
 
 def eps_greedy_policy_no_incentives(

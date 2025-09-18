@@ -79,8 +79,12 @@ def main(config: dict, total_budget: int) -> None:
     # Parameters to run SUMO
     sumo_params = config["sumo_config"]
 
+    # Instantiate drivers object
+    drivers = tr.Drivers(actions_file_path=paths_dict["output_rou_alt_path"])
+
     # Get available actions based on pre-computed routes
-    actions_and_costs = tr.get_actions(file_path=paths_dict["output_rou_alt_path"])
+    actions_and_costs = drivers.get_actions()
+
     # Unpack trips IDs
     trips_id = list(actions_and_costs.keys())
 
@@ -96,7 +100,11 @@ def main(config: dict, total_budget: int) -> None:
     )
 
     # Instantiate network object
-    network_env = env.Network(paths_dict=paths_dict, sumo_params=sumo_params)
+    network_env = env.Network(
+        paths_dict=paths_dict,
+        sumo_params=sumo_params,
+        edge_data_frequency=edge_data_frequency,
+    )
 
     # Train RL agent
     for i in range(episodes):
@@ -113,7 +121,6 @@ def main(config: dict, total_budget: int) -> None:
         )
         # Perform actions given by policy
         total_tt, ind_tt, ind_em, total_em = network_env.step(
-            edge_data_frequency=edge_data_frequency,
             routes_edges=routes_edges,
         )
 

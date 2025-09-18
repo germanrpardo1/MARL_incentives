@@ -1,13 +1,11 @@
 """This script runs the MARL algorithm with and without incentives."""
 
 import os
-import random
-from collections import deque
 
-import numpy as np
 from marl_incentives import environment as env
 from marl_incentives import traveller as tr
 from marl_incentives import utils as ut
+from marl_incentives.experience_replay import ReplayBuffer
 
 
 def save_metric(
@@ -50,22 +48,6 @@ def save_metric(
     )
 
 
-class ReplayBuffer:
-    def __init__(self, capacity=100):
-        self.buffer = deque(maxlen=capacity)
-
-    def push(self, action, reward):
-        self.buffer.append((action, reward))
-
-    def sample(self, batch_size):
-        batch = random.sample(self.buffer, batch_size)
-        actions, rewards = zip(*batch)
-        return np.array(actions), np.array(rewards)
-
-    def __len__(self):
-        return len(self.buffer)
-
-
 def main(config: dict, total_budget: int) -> None:
     """
     Run the MARL algorithm with or without incentives.
@@ -98,8 +80,12 @@ def main(config: dict, total_budget: int) -> None:
     # Parameters to run SUMO
     sumo_params = config["sumo_config"]
 
+    # Instantiate drivers object
+    drivers = tr.Drivers(actions_file_path=paths_dict["output_rou_alt_path"])
+
     # Get available actions based on pre-computed routes
-    actions_and_costs = tr.get_actions(file_path=paths_dict["output_rou_alt_path"])
+    actions_and_costs = drivers.get_actions()
+
     # Unpack trips IDs
     trips_id = list(actions_and_costs.keys())
 
@@ -115,7 +101,11 @@ def main(config: dict, total_budget: int) -> None:
     )
 
     # Instantiate network object
-    network_env = env.Network(paths_dict=paths_dict, sumo_params=sumo_params)
+    network_env = env.Network(
+        paths_dict=paths_dict,
+        sumo_params=sumo_params,
+        edge_data_frequency=edge_data_frequency,
+    )
 
     # Initialise replay buffer
     buffer = ReplayBuffer(capacity=100)
@@ -134,7 +124,6 @@ def main(config: dict, total_budget: int) -> None:
         )
         # Perform actions given by policy
         total_tt, ind_tt, ind_em, total_em = network_env.step(
-            edge_data_frequency=edge_data_frequency,
             routes_edges=routes_edges,
         )
 
