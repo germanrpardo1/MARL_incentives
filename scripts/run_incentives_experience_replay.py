@@ -48,16 +48,13 @@ def save_metric(
     )
 
 
-def main(config: dict, total_budget: int) -> None:
+def main(config, total_budget: int) -> None:
     """
-    Run the MARL algorithm with or without incentives.
+    Run the MARL algorithm with or without incentives with experience replay.
 
     :param config: Configuration dictionary.
     :param total_budget: Total budget.
     """
-    incentives_mode = config["incentives_mode"]
-    episodes = config["episodes"]
-
     # Weights of the objective function
     weights = {
         "ttt": config["TTT_weight"],
@@ -80,25 +77,17 @@ def main(config: dict, total_budget: int) -> None:
     # Parameters to run SUMO
     sumo_params = config["sumo_config"]
 
-    # Instantiate drivers object
-    drivers = tr.Drivers(actions_file_path=paths_dict["output_rou_alt_path"])
-
-    # Get available actions based on pre-computed routes
-    actions_and_costs = drivers.get_actions()
-
-    # Unpack trips IDs
-    trips_id = list(actions_and_costs.keys())
+    # Initialise all drivers
+    drivers = tr.initialise_drivers(
+        actions_file_path=paths_dict["output_rou_alt_path"],
+        incentives_mode=config["incentives_mode"],
+        strategy=config["strategy"],
+        epsilon=config["epsilon"],
+    )
 
     ttts = []
     emissions_total = []
     labels_dict = {}
-
-    # Initialise the Q-function
-    q_values = (
-        tr.initialise_q_function_incentives(actions_costs=actions_and_costs)
-        if incentives_mode
-        else tr.initialise_q_function_no_incentives(actions_costs=actions_and_costs)
-    )
 
     # Instantiate network object
     network_env = env.Network(
@@ -110,24 +99,21 @@ def main(config: dict, total_budget: int) -> None:
     # Initialise replay buffer
     buffer = ReplayBuffer(capacity=100)
     # Train RL agent
-    for i in range(episodes):
-        # Select policy function based on whether incentives are used or not
-        # Get actions from policy
-        routes_edges, actions_index = tr.policy_function(
-            incentives_mode=incentives_mode,
-            trips_id=trips_id,
-            q=q_values,
-            actions_costs=actions_and_costs,
-            epsilon=hyperparams["epsilon"],
-            total_budget=total_budget,
-            strategy=config["strategy"],
-        )
+    for i in range(config["episodes"]):
+        # Get actions from policy based on whether incentives are used or not
+        if config["incentives_mode"]:
+            routes_edges, actions_index = tr.policy_incentives(
+                drivers, total_budget=total_budget
+            )
+        else:
+            routes_edges, actions_index = tr.policy_no_incentives(drivers)
+
         # Perform actions given by policy
         total_tt, ind_tt, ind_em, total_em = network_env.step(
             routes_edges=routes_edges,
         )
 
-        reward_tuple = [total_tt, ind_tt, ind_em, total_em]
+        reward_tuple = [(60**2) * total_tt / 1100, ind_tt, ind_em, total_em]
         buffer.push(actions_index, reward_tuple)
 
         # Record TTT and total emissions throughout iterations
@@ -142,14 +128,14 @@ def main(config: dict, total_budget: int) -> None:
             for a, r in zip(acts, rews):
                 actions_index = a
                 total_tt, ind_tt, ind_em, total_em = r
-                for trip in trips_id:
-                    idx = actions_index[trip]
+                for driver in drivers:
+                    idx = actions_index[driver.trip_id]
                     # Compute reward
-                    reward = tr.compute_reward(
-                        trip, ind_tt, ind_em, total_tt, total_em, weights
+                    reward = driver.compute_reward(
+                        ind_tt, ind_em, total_tt, total_em, weights
                     )
                     # Update Q-value
-                    q_values[trip][idx] = (1 - hyperparams["alpha"]) * q_values[trip][
+                    driver.q_values[idx] = (1 - hyperparams["alpha"]) * driver.q_values[
                         idx
                     ] + hyperparams["alpha"] * reward
 
@@ -159,7 +145,9 @@ def main(config: dict, total_budget: int) -> None:
                 )
 
         # Logging
-        ut.log_progress(i=i, episodes=episodes, hyperparams=hyperparams, ttts=ttts)
+        ut.log_progress(
+            i=i, episodes=config["episodes"], hyperparams=hyperparams, ttts=ttts
+        )
 
     # Save the plot and pickle file for TTT and emissions
     save_metric(ttts, labels_dict, "exp_replay_ttt", "TTT [h]", total_budget, weights)

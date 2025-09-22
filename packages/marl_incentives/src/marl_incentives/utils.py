@@ -148,7 +148,7 @@ def plot_multiple_curves(
     baseline_values = load_pickle_array(baseline_path)
     if baseline_values is not None:
         baseline_values = baseline_values[:500]
-        if base_name == "emissions":
+        if base_name == "emissions" or base_name == "exp_replay_emissions":
             baseline_values /= 1000
         x, smoothed = smooth_curve(baseline_values, window_size)
         plt.plot(x, smoothed, label="Baseline", linewidth=2)

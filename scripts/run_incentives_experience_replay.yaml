@@ -3,11 +3,11 @@ episodes: 500
 
 ### Weights for different components of the reward/cost function
 # Weight for Total Travel Time (TTT) of the network
-TTT_weight: 0
+TTT_weight: 1
 # Weight for individual travel time of each agent
-individual_travel_time_weight: 0.75
+individual_travel_time_weight: 0
 # Weight for minimising individual emissions
-emissions_weight: 0.25
+emissions_weight: 0
 # Total emissions weight
 total_emissions_weight: 0
 
@@ -18,7 +18,7 @@ decay: 0.992
 # Learning rate (α) for Q-learning or other value update algorithms
 alpha: 0.1
 # Whether to use incentives or not
-incentives_mode: true
+incentives_mode: false
 # Total available budget for incentives or policies (can be used as a constraint)
 total_budget:
   - 100000000
