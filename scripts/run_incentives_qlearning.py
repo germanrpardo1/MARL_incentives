@@ -100,10 +100,12 @@ def main(config, total_budget: int) -> None:
         # Get actions from policy based on whether incentives are used or not
         if config["incentives_mode"]:
             routes_edges, actions_index = tr.policy_incentives(
-                drivers, total_budget=total_budget
+                drivers, total_budget=total_budget, epsilon=hyperparams["epsilon"]
             )
         else:
-            routes_edges, actions_index = tr.policy_no_incentives(drivers)
+            routes_edges, actions_index = tr.policy_no_incentives(
+                drivers, hyperparams["epsilon"]
+            )
 
         # Perform actions given by policy
         total_tt, ind_tt, ind_em, total_em = network_env.step(

@@ -16,7 +16,6 @@ class Driver:
         trip_id: str,
         routes: list[tuple[int, list]],
         costs: list,
-        epsilon: float,
         incentives_mode: bool,
         strategy: str = "argmin",
     ) -> None:
@@ -26,14 +25,12 @@ class Driver:
         :param trip_id: The trip ID.
         :param routes: The routes of the driver. Each entry of the form (index, edges).
         :param costs: The costs of the routes.
-        :param epsilon: The epsilon parameter for RL.
         :param incentives_mode: Whether the driver should include incentives or not.
         :param strategy: The strategy to assign routes.
         """
         self.trip_id = trip_id
         self.routes = routes
         self.costs = costs
-        self.epsilon = epsilon
         self.strategy = strategy
         # Initialise the Q-table
         self.q_values = (
@@ -44,7 +41,7 @@ class Driver:
             else np.zeros(len(self.costs))
         )
 
-    def eps_greedy_policy_no_incentives(self) -> tuple[list, int]:
+    def eps_greedy_policy_no_incentives(self, epsilon: float) -> tuple[list, int]:
         """
         Epsilon-greedy policy for selecting a route without incentives.
 
@@ -52,7 +49,7 @@ class Driver:
         """
         num_routes = len(self.costs)
         # Perform random action with probability epsilon
-        if _rng.random() <= self.epsilon:
+        if _rng.random() <= epsilon:
             random_int = _rng.integers(num_routes)
             route_idx = int(random_int)  # Random action index
         # Perform action with maximum Q-value with probability 1 - epsilon
@@ -63,7 +60,9 @@ class Driver:
         route_edges = self.routes[route_idx][1]
         return route_edges, route_idx
 
-    def eps_greedy_policy_incentives(self) -> tuple[list, int, int, float]:
+    def eps_greedy_policy_incentives(
+        self, epsilon: float
+    ) -> tuple[list, int, int, float]:
         """
         Epsilon-greedy policy for selecting a route with incentives.
 
@@ -72,7 +71,7 @@ class Driver:
         num_routes = len(self.costs)
 
         # Perform random action with probability epsilon
-        if _rng.random() <= self.epsilon:
+        if _rng.random() <= epsilon:
             random_int = _rng.integers(num_routes + 1)
             action_index = int(random_int)  # Random action index
         # Perform action with maximum Q-value with probability 1 - epsilon
@@ -147,7 +146,7 @@ class Driver:
         )
 
 
-def policy_no_incentives(drivers: list[Driver]) -> tuple[dict, dict]:
+def policy_no_incentives(drivers: list[Driver], epsilon: float) -> tuple[dict, dict]:
     """
     Policy function for the RL algorithm using epsilon-greedy strategy
         for when no incentives are applied.
@@ -161,7 +160,9 @@ def policy_no_incentives(drivers: list[Driver]) -> tuple[dict, dict]:
     actions_index = {}
     for driver in drivers:
         # Select action using epsilon-greedy strategy
-        selected_edges, selected_index = driver.eps_greedy_policy_no_incentives()
+        selected_edges, selected_index = driver.eps_greedy_policy_no_incentives(
+            epsilon=epsilon
+        )
 
         route_edges[driver.trip_id] = selected_edges
         actions_index[driver.trip_id] = selected_index
@@ -169,7 +170,9 @@ def policy_no_incentives(drivers: list[Driver]) -> tuple[dict, dict]:
     return route_edges, actions_index
 
 
-def policy_incentives(drivers: list[Driver], total_budget: float) -> tuple[dict, dict]:
+def policy_incentives(
+    drivers: list[Driver], total_budget: float, epsilon: float
+) -> tuple[dict, dict]:
     """
     Policy function for the RL algorithm using epsilon-greedy strategy
         for when incentives are applied.
@@ -187,7 +190,7 @@ def policy_incentives(drivers: list[Driver], total_budget: float) -> tuple[dict,
     for driver in drivers:
         # Select action using epsilon-greedy strategy
         selected_edges, selected_action, selected_index, incentive = (
-            driver.eps_greedy_policy_incentives()
+            driver.eps_greedy_policy_incentives(epsilon=epsilon)
         )
 
         # If there is no budget left, select route according to route strategy
@@ -237,7 +240,6 @@ def initialise_drivers(
                 trip_id=vehicle.get("id"),
                 routes=routes,
                 costs=costs,
-                epsilon=epsilon,
                 strategy=strategy,
                 incentives_mode=incentives_mode,
             )
