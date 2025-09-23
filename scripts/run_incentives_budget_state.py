@@ -2,8 +2,10 @@
 
 import os
 
+import torch
+import torch.nn.functional as F
 from marl_incentives import environment as env
-from marl_incentives import traveller as tr
+from marl_incentives import traveller_with_budget_state as tr
 from marl_incentives import utils as ut
 from marl_incentives.experience_replay import ReplayBuffer
 
@@ -82,7 +84,7 @@ def main(config, total_budget: int) -> None:
         actions_file_path=paths_dict["output_rou_alt_path"],
         incentives_mode=config["incentives_mode"],
         strategy=config["strategy"],
-        epsilon=config["epsilon"],
+        budget=total_budget,
     )
 
     ttts = []
@@ -125,22 +127,28 @@ def main(config, total_budget: int) -> None:
 
         # For each agent update Q function
         # Q(a) = (1 - alpha) * Q(a) + alpha * r
-        batch_size = 32
+        batch_size = 2
+        # TODO(german): complete
         if len(buffer) >= batch_size:
             acts, rews = buffer.sample(batch_size)
-            for a, r in zip(acts, rews):
-                actions_index = a
-                total_tt, ind_tt, ind_em, total_em = r
-                for driver in drivers:
-                    idx = actions_index[driver.trip_id]
-                    # Compute reward
-                    reward = driver.compute_reward(
-                        ind_tt, ind_em, total_tt, total_em, weights
+            total_tt, ind_tt, ind_em, total_em = rews
+            for driver in drivers:
+                # Compute reward
+                # Update Q-networks
+                q_targets = torch.tensor(
+                    [[ind_tt]], dtype=torch.float32, device=driver.device
+                )
+                # Calculate expected value from local network
+                q_expected = driver.q_network_local(
+                    torch.tensor(
+                        [[driver.state]], dtype=torch.float32, device=driver.device
                     )
-                    # Update Q-value
-                    driver.q_values[idx] = (1 - hyperparams["alpha"]) * driver.q_values[
-                        idx
-                    ] + hyperparams["alpha"] * reward
+                ).gather(1, acts[driver.trip_id])
+                # Loss calculation (we used Mean squared error)
+                loss = F.mse_loss(q_expected, q_targets)
+                driver.optimizer.zero_grad()
+                loss.backward()
+                driver.optimizer.step()
 
                 # Reduce epsilon
                 hyperparams["epsilon"] = max(
@@ -166,7 +174,7 @@ def main(config, total_budget: int) -> None:
 
 if __name__ == "__main__":
     # Load config
-    config_file = ut.load_config(path="scripts/run_incentives_experience_replay.yaml")
+    config_file = ut.load_config(path="scripts/run_incentives_budget_state.yaml")
 
     # Loop for different budgets
     for tot_budget in config_file["total_budget"]:
