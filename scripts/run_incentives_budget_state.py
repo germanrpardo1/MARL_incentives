@@ -2,6 +2,7 @@
 
 import os
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 from marl_incentives import environment as env
@@ -82,7 +83,6 @@ def main(config, total_budget: int) -> None:
     # Initialise all drivers
     drivers = tr.initialise_drivers(
         actions_file_path=paths_dict["output_rou_alt_path"],
-        incentives_mode=config["incentives_mode"],
         strategy=config["strategy"],
         budget=total_budget,
     )
@@ -103,23 +103,20 @@ def main(config, total_budget: int) -> None:
 
     # Train RL agent
     for i in range(config["episodes"]):
-        # Get actions from policy based on whether incentives are used or not
-        if config["incentives_mode"]:
-            routes_edges, actions_index = tr.policy_incentives(
-                drivers, total_budget=total_budget, epsilon=hyperparams["epsilon"]
-            )
-        else:
-            routes_edges, actions_index = tr.policy_no_incentives(
-                drivers, hyperparams["epsilon"]
-            )
+        # Get actions from policy
+        routes_edges, actions_index = tr.policy_incentives(
+            drivers, total_budget=total_budget, epsilon=hyperparams["epsilon"]
+        )
 
         # Perform actions given by policy
         total_tt, ind_tt, ind_em, total_em = network_env.step(
             routes_edges=routes_edges,
         )
 
-        reward_tuple = [(60**2) * total_tt / 1100, ind_tt, ind_em, total_em]
-        buffer.push(actions_index, reward_tuple)
+        reward_tuple = list(ind_tt.values())
+        actions_tuple = list(actions_index.values())
+        states_tuple = [driver.state for driver in drivers]
+        buffer.push(states_tuple, actions_tuple, reward_tuple)
 
         # Record TTT and total emissions throughout iterations
         ttts.append(total_tt)
@@ -130,22 +127,64 @@ def main(config, total_budget: int) -> None:
         batch_size = 2
         # TODO(german): complete
         if len(buffer) >= batch_size:
-            acts, rews = buffer.sample(batch_size)
-            total_tt, ind_tt, ind_em, total_em = rews
-            for driver in drivers:
-                # Compute reward
-                # Update Q-networks
+            # Sample from replay buffer
+            states, actions, rews = buffer.sample(batch_size)
+
+            # Transpose so we get per-driver lists
+            rewards_all_drivers = [list(x) for x in zip(*rews)]
+            actions_all_drivers = [list(x) for x in zip(*actions)]
+            states_all_drivers = [list(x) for x in zip(*states)]
+
+            for j, driver in enumerate(drivers):
+                rewards_per_driver = rewards_all_drivers[j]
+                actions_per_driver = actions_all_drivers[j]
+                states_per_driver = states_all_drivers[j]
+
+                # Rewards: [batch_size, 1]
                 q_targets = torch.tensor(
-                    [[ind_tt]], dtype=torch.float32, device=driver.device
+                    rewards_per_driver, dtype=torch.float32, device=driver.device
+                ).unsqueeze(1)
+
+                # Convert list of numpy arrays to a single numpy array first (faster)
+                state_batch = np.array(states_per_driver, dtype=np.float32)
+
+                # Convert to tensor
+                state_batch = torch.tensor(
+                    state_batch, dtype=torch.float32, device=driver.device
                 )
-                # Calculate expected value from local network
-                q_expected = driver.q_network_local(
-                    torch.tensor(
-                        [[driver.state]], dtype=torch.float32, device=driver.device
-                    )
-                ).gather(1, acts[driver.trip_id])
-                # Loss calculation (we used Mean squared error)
+
+                # If shape is [batch_size, 1, state_dim], squeeze unnecessary dims
+                state_batch = state_batch.view(
+                    len(states_per_driver), -1
+                )  # [batch_size, state_dim]
+
+                # Ensure batch dimension exists
+                if state_batch.dim() == 1:  # single state
+                    state_batch = state_batch.unsqueeze(0)  # shape [1, state_dim]
+
+                # Forward pass
+                q_values = driver.q_network_local(
+                    state_batch
+                )  # should be [batch_size, num_actions]
+
+                # Convert actions to tensor
+                actions_tensor = torch.tensor(
+                    actions_per_driver, dtype=torch.int64, device=driver.device
+                )
+
+                # Ensure actions tensor is 2D: [batch_size, 1]
+                if actions_tensor.dim() == 1:
+                    actions_tensor = actions_tensor.unsqueeze(1)
+
+                # Now gather works
+                q_expected = q_values.gather(
+                    1, actions_tensor
+                )  # now works: [batch_size, 1]
+
+                # Loss calculation (Mean Squared Error between predicted Q and target Q)
                 loss = F.mse_loss(q_expected, q_targets)
+
+                # Gradient step
                 driver.optimizer.zero_grad()
                 loss.backward()
                 driver.optimizer.step()

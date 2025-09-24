@@ -15,16 +15,17 @@ class ReplayBuffer:
         """
         self.buffer = deque(maxlen=capacity)
 
-    def push(self, action: dict, reward: list) -> None:
+    def push(self, state: list, action: list, reward: list) -> None:
         """
         Add elements to the replay buffer.
 
+        :param state: State to add to the buffer.
         :param action: Action to add to the buffer.
         :param reward: Reward to add to the buffer.
         """
-        self.buffer.append((action, reward))
+        self.buffer.append((state, action, reward))
 
-    def sample(self, batch_size: int) -> tuple[np.ndarray, np.ndarray]:
+    def sample(self, batch_size: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Sample from the replay buffer.
 
@@ -32,8 +33,8 @@ class ReplayBuffer:
         :return: Tuple of sampled actions and sampled rewards.
         """
         batch = random.sample(self.buffer, batch_size)
-        actions, rewards = zip(*batch)
-        return np.array(actions), np.array(rewards)
+        state, actions, rewards = zip(*batch)
+        return np.array(state), np.array(actions), np.array(rewards)
 
     def __len__(self) -> int:
         """Get the size of the replay buffer."""

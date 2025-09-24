@@ -20,7 +20,6 @@ class Driver:
         trip_id: str,
         routes: list[tuple[int, list]],
         costs: list,
-        incentives_mode: bool,
         strategy: str = "argmin",
     ) -> None:
         """
@@ -30,50 +29,24 @@ class Driver:
         :param trip_id: The trip ID.
         :param routes: The routes of the driver. Each entry of the form (index, edges).
         :param costs: The costs of the routes.
-        :param incentives_mode: Whether the driver should include incentives or not.
         :param strategy: The strategy to assign routes.
         """
-        self.state = budget
+
         self.trip_id = trip_id
         self.routes = routes
         self.costs = costs
         self.strategy = strategy
 
         self.state_size = 1
-        self.action_size = len(self.costs) + 1 if incentives_mode else self.costs
+        self.action_size = len(self.costs) + 1
 
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.state = torch.tensor([[budget]], dtype=torch.float32, device=self.device)
 
         # Q-Network
         self.q_network_local = DQN(self.state_size, self.action_size).to(self.device)
         self.q_network_target = DQN(self.state_size, self.action_size).to(self.device)
         self.optimizer = optim.Adam(self.q_network_local.parameters(), lr=5e-4)
-
-    def eps_greedy_policy_no_incentives(self, epsilon: float) -> tuple[list, int]:
-        """
-        Epsilon-greedy policy for selecting a route without incentives.
-
-        :return: (route_edges, selected_action, action_index)
-        """
-        state = torch.tensor([[self.state]], dtype=torch.float32, device=self.device)
-        self.q_network_local.eval()
-        with torch.no_grad():
-            action_values = self.q_network_local(state).cpu().numpy().reshape(-1)
-        self.q_network_local.train()
-
-        num_routes = len(self.costs)
-
-        # Perform random action with probability epsilon
-        if _rng.random() <= epsilon:
-            random_int = _rng.integers(num_routes)
-            route_idx = int(random_int)  # Random action index
-        # Perform action with maximum Q-value with probability 1 - epsilon
-        else:
-            route_idx = int(action_values.argmin())
-
-        # Get route edges to write them in the .XML file
-        route_edges = self.routes[route_idx][1]
-        return route_edges, route_idx
 
     def eps_greedy_policy_incentives(
         self, epsilon: float
@@ -83,10 +56,9 @@ class Driver:
 
         :return: (route_edges, selected_action, action_index, applied_incentive)
         """
-        state = torch.tensor([[self.state]], dtype=torch.float32, device=self.device)
         self.q_network_local.eval()
         with torch.no_grad():
-            action_values = self.q_network_local(state).cpu().numpy().reshape(-1)
+            action_values = self.q_network_local(self.state).cpu().numpy().reshape(-1)
         self.q_network_local.train()
 
         num_routes = len(self.costs)
@@ -105,7 +77,6 @@ class Driver:
             incentive = self.costs[action_index] - min(self.costs) + 1
             # Apply incentive to cost
             adjusted_costs[action_index] -= incentive
-            # TODO(German): update state: budget reduction
         else:
             incentive = 0
 
@@ -168,30 +139,6 @@ class Driver:
         )
 
 
-def policy_no_incentives(drivers: list[Driver], epsilon: float) -> tuple[dict, dict]:
-    """
-    Policy function for the RL algorithm using epsilon-greedy strategy
-        for when no incentives are applied.
-
-    :param drivers: List of objects of type Driver.
-    :return: Tuple containing:
-             - route_edges: mapping trip_id to selected route edges
-             - actions_index: mapping trip_id to selected (route_idx, incentive_level)
-    """
-    route_edges = {}
-    actions_index = {}
-    for driver in drivers:
-        # Select action using epsilon-greedy strategy
-        selected_edges, selected_index = driver.eps_greedy_policy_no_incentives(
-            epsilon=epsilon
-        )
-
-        route_edges[driver.trip_id] = selected_edges
-        actions_index[driver.trip_id] = selected_index
-
-    return route_edges, actions_index
-
-
 def policy_incentives(
     drivers: list[Driver], total_budget: float, epsilon: float
 ) -> tuple[dict, dict]:
@@ -207,22 +154,29 @@ def policy_incentives(
     """
     route_edges = {}
     actions_index = {}
-    current_budget = 0
+    current_used_budget = 0
 
-    for driver in drivers:
+    for i, driver in enumerate(drivers):
+        if i != 0:
+            # Update state from the incentive used by the previous driver
+            new_state = total_budget - current_used_budget
+
+            driver.state = torch.tensor(
+                [[new_state]], dtype=torch.float32, device=driver.device
+            )
+
         # Select action using epsilon-greedy strategy
         selected_edges, selected_action, selected_index, incentive = (
             driver.eps_greedy_policy_incentives(epsilon=epsilon)
         )
 
         # If there is no budget left, select route according to route strategy
-        if current_budget + incentive > total_budget:
+        if current_used_budget + incentive > total_budget:
             selected_action = driver.route_selection_strategy(driver.strategy)
             selected_edges = driver.routes[selected_action][1]
             incentive = 0
 
-        # Update budget and tracking dictionaries
-        current_budget += incentive
+        current_used_budget += incentive
         route_edges[driver.trip_id] = selected_edges
         actions_index[driver.trip_id] = selected_index
 
@@ -230,13 +184,12 @@ def policy_incentives(
 
 
 def initialise_drivers(
-    actions_file_path: str, incentives_mode: bool, strategy: str, budget: float
+    actions_file_path: str, strategy: str, budget: float
 ) -> list[Driver]:
     """
     Initialise all the drivers of type Driver.
 
     :param actions_file_path: Path to the XML file.
-    :param incentives_mode: Whether the incentives are applied.
     :param strategy: Strategy used to select routes.
     :param budget: Budget for the traveller.
     :return: A list of drivers of type Driver.
@@ -264,7 +217,6 @@ def initialise_drivers(
                 routes=routes,
                 costs=costs,
                 strategy=strategy,
-                incentives_mode=incentives_mode,
             )
         )
 
