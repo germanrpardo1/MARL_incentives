@@ -63,7 +63,8 @@ class Driver:
         num_routes = len(self.costs)
 
         # Perform random action with probability epsilon
-        if _rng.random() <= epsilon:
+        rnd = _rng.random()
+        if rnd <= epsilon:
             random_int = _rng.integers(num_routes + 1)
             action_index = int(random_int)  # Random action index
         # Perform action with maximum Q-value with probability 1 - epsilon

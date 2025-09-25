@@ -186,10 +186,10 @@ def main(config, total_budget: int) -> None:
                 loss.backward()
                 driver.optimizer.step()
 
-                # Reduce epsilon
-                hyperparams["epsilon"] = max(
-                    0.01, hyperparams["epsilon"] * hyperparams["decay"]
-                )
+        # Reduce epsilon
+        hyperparams["epsilon"] = max(
+            0.01, hyperparams["epsilon"] * hyperparams["decay"]
+        )
 
         # Logging
         ut.log_progress(
