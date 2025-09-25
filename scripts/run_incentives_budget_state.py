@@ -122,10 +122,7 @@ def main(config, total_budget: int) -> None:
         ttts.append(total_tt)
         emissions_total.append(total_em)
 
-        # For each agent update Q function
-        # Q(a) = (1 - alpha) * Q(a) + alpha * r
-        batch_size = 2
-        # TODO(german): complete
+        batch_size = 32
         if len(buffer) >= batch_size:
             # Sample from replay buffer
             states, actions, rews = buffer.sample(batch_size)
@@ -163,7 +160,7 @@ def main(config, total_budget: int) -> None:
                     state_batch = state_batch.unsqueeze(0)  # shape [1, state_dim]
 
                 # Forward pass
-                q_values = driver.q_network_local(
+                q_values = driver.q_network(
                     state_batch
                 )  # should be [batch_size, num_actions]
 
@@ -200,11 +197,13 @@ def main(config, total_budget: int) -> None:
         )
 
     # Save the plot and pickle file for TTT and emissions
-    save_metric(ttts, labels_dict, "exp_replay_ttt", "TTT [h]", total_budget, weights)
+    save_metric(
+        ttts, labels_dict, "continuous_state_ttt", "TTT [h]", total_budget, weights
+    )
     save_metric(
         emissions_total,
         labels_dict,
-        "exp_replay_emissions",
+        "continuous_state_emissions",
         "Emissions [kg]",
         total_budget,
         weights,

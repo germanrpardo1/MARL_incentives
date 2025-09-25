@@ -44,9 +44,8 @@ class Driver:
         self.state = torch.tensor([[budget]], dtype=torch.float32, device=self.device)
 
         # Q-Network
-        self.q_network_local = DQN(self.state_size, self.action_size).to(self.device)
-        self.q_network_target = DQN(self.state_size, self.action_size).to(self.device)
-        self.optimizer = optim.Adam(self.q_network_local.parameters(), lr=5e-4)
+        self.q_network = DQN(self.state_size, self.action_size).to(self.device)
+        self.optimizer = optim.Adam(self.q_network.parameters(), lr=5e-4)
 
     def eps_greedy_policy_incentives(
         self, epsilon: float
@@ -56,10 +55,10 @@ class Driver:
 
         :return: (route_edges, selected_action, action_index, applied_incentive)
         """
-        self.q_network_local.eval()
+        self.q_network.eval()
         with torch.no_grad():
-            action_values = self.q_network_local(self.state).cpu().numpy().reshape(-1)
-        self.q_network_local.train()
+            action_values = self.q_network(self.state).cpu().numpy().reshape(-1)
+        self.q_network.train()
 
         num_routes = len(self.costs)
 
@@ -147,7 +146,8 @@ def policy_incentives(
         for when incentives are applied.
 
     :param drivers: List of objects of type Driver.
-    :param total_budget: Maximum total incentive budget
+    :param total_budget: Maximum total incentive budget.
+    :param epsilon: Probability to select a random action.
     :return: Tuple containing:
              - route_edges: mapping trip_id to selected route edges
              - actions_index: mapping trip_id to selected (route_idx, incentive_level)
