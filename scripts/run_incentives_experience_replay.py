@@ -119,6 +119,7 @@ def main(config, total_budget: int) -> None:
         ttts.append(total_tt)
         emissions_total.append(total_em)
 
+        # If there are enough observations in the buffer, sample and update Qs
         if len(network_env.buffer) >= network_env.buffer.batch_size:
             acts, rewards = network_env.buffer.sample(network_env.buffer.batch_size)
             for a, r in zip(acts, rewards):

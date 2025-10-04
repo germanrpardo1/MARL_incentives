@@ -8,7 +8,6 @@ import torch.nn.functional as F
 from marl_incentives import environment as env
 from marl_incentives import traveller_with_budget_state as tr
 from marl_incentives import utils as ut
-from marl_incentives.replay_buffer_state import ReplayBuffer
 
 
 def save_metric(
@@ -98,9 +97,6 @@ def main(config, total_budget: int) -> None:
         edge_data_frequency=edge_data_frequency,
     )
 
-    # Initialise replay buffer
-    buffer = ReplayBuffer(capacity=100)
-
     # Train RL agent
     for i in range(config["episodes"]):
         # Get actions from policy
@@ -109,26 +105,28 @@ def main(config, total_budget: int) -> None:
         )
 
         # Perform actions given by policy
-        total_tt, ind_tt, ind_em, total_em = network_env.step(
+        total_tt, ind_tt, _, total_em = network_env.step(
             routes_edges=routes_edges,
         )
 
         reward_tuple = list(ind_tt.values())
         actions_tuple = list(actions_index.values())
         states_tuple = [driver.state for driver in drivers]
-        buffer.push(states_tuple, actions_tuple, reward_tuple)
+        network_env.buffer.push(states_tuple, actions_tuple, reward_tuple)
 
         # Record TTT and total emissions throughout iterations
         ttts.append(total_tt)
         emissions_total.append(total_em)
 
-        batch_size = 32
-        if len(buffer) >= batch_size:
+        # If there are enough observations, perform a gradient step
+        if len(network_env.buffer) >= network_env.buffer.batch_size:
             # Sample from replay buffer
-            states, actions, rews = buffer.sample(batch_size)
+            states, actions, rewards = network_env.buffer.sample(
+                network_env.buffer.batch_size
+            )
 
             # Transpose so we get per-driver lists
-            rewards_all_drivers = [list(x) for x in zip(*rews)]
+            rewards_all_drivers = [list(x) for x in zip(*rewards)]
             actions_all_drivers = [list(x) for x in zip(*actions)]
             states_all_drivers = [list(x) for x in zip(*states)]
 
