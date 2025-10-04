@@ -50,13 +50,8 @@ def save_metric(
     )
 
 
-def main(config, total_budget: int) -> None:
-    """
-    Run the MARL algorithm with or without incentives with experience replay.
-
-    :param config: Configuration dictionary.
-    :param total_budget: Total budget.
-    """
+def unpack_config(config: dict) -> tuple[dict, dict, dict, int, dict]:
+    """Complete."""
     # Weights of the objective function
     weights = {
         "ttt": config["TTT_weight"],
@@ -79,6 +74,21 @@ def main(config, total_budget: int) -> None:
     # Parameters to run SUMO
     sumo_params = config["sumo_config"]
 
+    return weights, hyperparams, paths_dict, edge_data_frequency, sumo_params
+
+
+def main(config, total_budget: int) -> None:
+    """
+    Run the MARL algorithm with or without incentives with experience replay.
+
+    :param config: Configuration dictionary.
+    :param total_budget: Total budget.
+    """
+    # Unpack configuration file
+    weights, hyperparams, paths_dict, edge_data_frequency, sumo_params = unpack_config(
+        config
+    )
+
     # Initialise all drivers
     drivers = tr.initialise_drivers(
         actions_file_path=paths_dict["output_rou_alt_path"],
@@ -95,6 +105,7 @@ def main(config, total_budget: int) -> None:
         paths_dict=paths_dict,
         sumo_params=sumo_params,
         edge_data_frequency=edge_data_frequency,
+        state_mode=True,
     )
 
     # Train RL agent
@@ -117,7 +128,7 @@ def main(config, total_budget: int) -> None:
         # Record TTT and total emissions throughout iterations
         ttts.append(total_tt)
         emissions_total.append(total_em)
-
+        network_env.buffer.batch_size = 2
         # If there are enough observations, perform a gradient step
         if len(network_env.buffer) >= network_env.buffer.batch_size:
             # Sample from replay buffer

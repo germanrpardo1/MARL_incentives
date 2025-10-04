@@ -6,8 +6,8 @@ import sys
 import sumolib
 
 import marl_incentives.calculate_emissions as em
+import marl_incentives.replay_buffer as rb
 from marl_incentives import xml_manipulation as xmlm
-from marl_incentives.replay_buffer import ReplayBuffer
 
 
 class Network:
@@ -19,6 +19,7 @@ class Network:
         sumo_params: dict,
         edge_data_frequency: int,
         buffer_capacity: int = 100,
+        state_mode: bool = False,
     ) -> None:
         """
         Constructor method for the Network class.
@@ -31,7 +32,10 @@ class Network:
         self.paths_dict = paths_dict
         self.sumo_params = sumo_params
         self.edge_data_frequency = edge_data_frequency
-        self.buffer = ReplayBuffer(capacity=buffer_capacity)
+        if not state_mode:
+            self.buffer = rb.ReplayBuffer(capacity=buffer_capacity)
+        else:
+            self.buffer = rb.StateReplayBuffer(capacity=buffer_capacity)
 
     def run_simulation(self) -> None:
         """Run a SUMO simulation."""
