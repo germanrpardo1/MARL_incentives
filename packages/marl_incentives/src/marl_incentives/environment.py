@@ -7,6 +7,7 @@ import sumolib
 
 import marl_incentives.calculate_emissions as em
 from marl_incentives import xml_manipulation as xmlm
+from marl_incentives.replay_buffer import ReplayBuffer
 
 
 class Network:
@@ -17,6 +18,7 @@ class Network:
         paths_dict: dict,
         sumo_params: dict,
         edge_data_frequency: int,
+        buffer_capacity: int = 100,
     ) -> None:
         """
         Constructor method for the Network class.
@@ -24,10 +26,12 @@ class Network:
         :param paths_dict: Dict of paths (routes file, edge data, emissions, etc.)
         :param sumo_params: SUMO simulation configuration
         :param edge_data_frequency: Frequency of edge data (in seconds)
+        :param buffer_capacity: Maximum size of the replay buffer.
         """
         self.paths_dict = paths_dict
         self.sumo_params = sumo_params
         self.edge_data_frequency = edge_data_frequency
+        self.buffer = ReplayBuffer(capacity=buffer_capacity)
 
     def run_simulation(self) -> None:
         """Run a SUMO simulation."""

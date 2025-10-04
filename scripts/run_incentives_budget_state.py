@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from marl_incentives import environment as env
 from marl_incentives import traveller_with_budget_state as tr
 from marl_incentives import utils as ut
-from marl_incentives.experience_replay import ReplayBuffer
+from marl_incentives.replay_buffer_state import ReplayBuffer
 
 
 def save_metric(

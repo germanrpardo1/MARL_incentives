@@ -80,7 +80,7 @@ class Driver:
 
         adjusted_costs = self.costs.copy()
         # Compute incentive to apply
-        if action_index + 1 <= num_routes:
+        if action_index < num_routes:
             incentive = self.costs[action_index] - min(self.costs) + 1
             # Apply incentive to cost
             adjusted_costs[action_index] -= incentive
@@ -91,20 +91,21 @@ class Driver:
         # Here, the route selection strategy should always be minimum cost
         # as we assume that travellers take the incentivised route deterministically
         # when participation rate is added, this will need modification
-        selected_action = self.route_selection_strategy(strategy="argmin")
+        selected_action = self.route_selection_strategy(
+            strategy="argmin", costs=adjusted_costs
+        )
         route_edges = self.routes[selected_action][1]
 
         return route_edges, selected_action, action_index, incentive
 
-    def route_selection_strategy(self, strategy: str) -> int:
+    def route_selection_strategy(self, strategy: str, costs) -> int:
         """
         Select the strategy for route selection when there is no budget left.
 
         :param strategy: Route selection strategy.
+        :param costs: The costs of the routes after adjusting.
         :return: Route index.
         """
-        costs = np.array(self.costs)
-
         if strategy == "argmin":
             return int(np.argmin(costs))
 

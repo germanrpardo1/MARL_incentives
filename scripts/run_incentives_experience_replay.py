@@ -5,7 +5,6 @@ import os
 from marl_incentives import environment as env
 from marl_incentives import traveller as tr
 from marl_incentives import utils as ut
-from marl_incentives.experience_replay import ReplayBuffer
 
 
 def save_metric(
@@ -96,9 +95,6 @@ def main(config, total_budget: int) -> None:
         edge_data_frequency=edge_data_frequency,
     )
 
-    # Initialise replay buffer
-    buffer = ReplayBuffer(capacity=100)
-
     # Train RL agent
     for i in range(config["episodes"]):
         # Get actions from policy based on whether incentives are used or not
@@ -117,30 +113,24 @@ def main(config, total_budget: int) -> None:
         )
 
         reward_tuple = [(60**2) * total_tt / 1100, ind_tt, ind_em, total_em]
-        buffer.push(actions_index, reward_tuple)
+        network_env.buffer.push(actions_index, reward_tuple)
 
         # Record TTT and total emissions throughout iterations
         ttts.append(total_tt)
         emissions_total.append(total_em)
 
-        # For each agent update Q function
-        # Q(a) = (1 - alpha) * Q(a) + alpha * r
-        batch_size = 32
-        if len(buffer) >= batch_size:
-            acts, rews = buffer.sample(batch_size)
-            for a, r in zip(acts, rews):
-                actions_index = a
-                total_tt, ind_tt, ind_em, total_em = r
-                for driver in drivers:
-                    idx = actions_index[driver.trip_id]
-                    # Compute reward
-                    reward = driver.compute_reward(
-                        ind_tt, ind_em, total_tt, total_em, weights
-                    )
-                    # Update Q-value
-                    driver.q_values[idx] = (1 - hyperparams["alpha"]) * driver.q_values[
-                        idx
-                    ] + hyperparams["alpha"] * reward
+        if len(network_env.buffer) >= network_env.buffer.batch_size:
+            acts, rewards = network_env.buffer.sample(network_env.buffer.batch_size)
+            for a, r in zip(acts, rewards):
+                # For each agent update Q function
+                # Q(a) = (1 - alpha) * Q(a) + alpha * r
+                network_env.buffer.update_q_values(
+                    drivers=drivers,
+                    action_index=a,
+                    reward=r,
+                    weights=weights,
+                    alpha=hyperparams["alpha"],
+                )
 
                 # Reduce epsilon
                 hyperparams["epsilon"] = max(

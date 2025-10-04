@@ -7,13 +7,15 @@ import numpy as np
 
 
 class ReplayBuffer:
-    def __init__(self, capacity: int = 100) -> None:
+    def __init__(self, capacity: int = 100, batch_size: int = 32) -> None:
         """
         Initialise capacity.
 
         :param capacity: Maximum size of the replay buffer.
+        :param batch_size: Size of each batch.
         """
         self.buffer = deque(maxlen=capacity)
+        self.batch_size = batch_size
 
     def push(self, state: list, action: list, reward: list) -> None:
         """
