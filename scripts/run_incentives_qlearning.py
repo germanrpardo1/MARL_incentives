@@ -81,7 +81,6 @@ def main(config, total_budget: int) -> None:
         actions_file_path=paths_dict["output_rou_alt_path"],
         incentives_mode=config["incentives_mode"],
         strategy=config["strategy"],
-        epsilon=config["epsilon"],
     )
 
     ttts = []

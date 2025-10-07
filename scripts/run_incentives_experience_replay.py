@@ -47,13 +47,8 @@ def save_metric(
     )
 
 
-def main(config, total_budget: int) -> None:
-    """
-    Run the MARL algorithm with or without incentives with experience replay.
-
-    :param config: Configuration dictionary.
-    :param total_budget: Total budget.
-    """
+def unpack_config(config: dict) -> tuple[dict, dict, dict, int, dict]:
+    """Complete."""
     # Weights of the objective function
     weights = {
         "ttt": config["TTT_weight"],
@@ -76,12 +71,26 @@ def main(config, total_budget: int) -> None:
     # Parameters to run SUMO
     sumo_params = config["sumo_config"]
 
+    return weights, hyperparams, paths_dict, edge_data_frequency, sumo_params
+
+
+def main(config, total_budget: int) -> None:
+    """
+    Run the MARL algorithm with or without incentives with experience replay.
+
+    :param config: Configuration dictionary.
+    :param total_budget: Total budget.
+    """
+    # Unpack configuration file
+    weights, hyperparams, paths_dict, edge_data_frequency, sumo_params = unpack_config(
+        config
+    )
+
     # Initialise all drivers
     drivers = tr.initialise_drivers(
         actions_file_path=paths_dict["output_rou_alt_path"],
         incentives_mode=config["incentives_mode"],
         strategy=config["strategy"],
-        epsilon=config["epsilon"],
     )
 
     ttts = []

@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from marl_incentives import environment as env
-from marl_incentives import traveller_with_budget_state as tr
+from marl_incentives import traveller as tr
 from marl_incentives import utils as ut
 
 
@@ -90,7 +90,7 @@ def main(config, total_budget: int) -> None:
     )
 
     # Initialise all drivers
-    drivers = tr.initialise_drivers(
+    drivers = tr.initialise_drivers_state(
         actions_file_path=paths_dict["output_rou_alt_path"],
         strategy=config["strategy"],
         budget=total_budget,
@@ -111,7 +111,7 @@ def main(config, total_budget: int) -> None:
     # Train RL agent
     for i in range(config["episodes"]):
         # Get actions from policy
-        routes_edges, actions_index = tr.policy_incentives(
+        routes_edges, actions_index = tr.policy_incentives_state(
             drivers, total_budget=total_budget, epsilon=hyperparams["epsilon"]
         )
 
@@ -128,7 +128,7 @@ def main(config, total_budget: int) -> None:
         # Record TTT and total emissions throughout iterations
         ttts.append(total_tt)
         emissions_total.append(total_em)
-        network_env.buffer.batch_size = 2
+
         # If there are enough observations, perform a gradient step
         if len(network_env.buffer) >= network_env.buffer.batch_size:
             # Sample from replay buffer
@@ -183,9 +183,7 @@ def main(config, total_budget: int) -> None:
                     actions_tensor = actions_tensor.unsqueeze(1)
 
                 # Now gather works
-                q_expected = q_values.gather(
-                    1, actions_tensor
-                )  # now works: [batch_size, 1]
+                q_expected = q_values.gather(1, actions_tensor)
 
                 # Loss calculation (Mean Squared Error between predicted Q and target Q)
                 loss = F.mse_loss(q_expected, q_targets)
@@ -195,10 +193,10 @@ def main(config, total_budget: int) -> None:
                 loss.backward()
                 driver.optimizer.step()
 
-        # Reduce epsilon
-        hyperparams["epsilon"] = max(
-            0.01, hyperparams["epsilon"] * hyperparams["decay"]
-        )
+            # Reduce epsilon
+            hyperparams["epsilon"] = max(
+                0.01, hyperparams["epsilon"] * hyperparams["decay"]
+            )
 
         # Logging
         ut.log_progress(

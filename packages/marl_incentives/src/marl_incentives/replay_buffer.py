@@ -56,7 +56,7 @@ class ReplayBuffer:
 
 
 class StateReplayBuffer:
-    def __init__(self, capacity: int = 100, batch_size: int = 32) -> None:
+    def __init__(self, capacity: int = 200, batch_size: int = 64) -> None:
         """
         Initialise capacity.
 
