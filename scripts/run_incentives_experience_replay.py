@@ -1,77 +1,8 @@
 """This script runs the MARL algorithm with and without incentives."""
 
-import os
-
 from marl_incentives import environment as env
 from marl_incentives import traveller as tr
 from marl_incentives import utils as ut
-
-
-def save_metric(
-    values: list[float],
-    labels: dict,
-    base_name: str,
-    y_label: str,
-    budget: int,
-    weights: dict,
-) -> None:
-    """
-    Save a plot and corresponding pickle file for a given metric using
-        consistent naming conventions.
-
-    :param values: List of metric values over time (e.g., per episode).
-    :param labels: Dictionary of plot labels (e.g., title, y-axis label).
-    :param base_name: The metric name (used in file naming and plot title).
-    :param y_label: Y-axis label for the plot.
-    :param budget: Total budget used in the experiment.
-    :param weights: Dictionary of weights used in the experiment.
-    """
-    labels["title"] = f"{base_name.replace('_', ' ').title()} per episode"
-    labels["y_label"] = y_label
-
-    # Generate file paths
-    pickle_path = ut.make_file_paths(base_name, "pickle_files", budget, weights, "pkl")
-    plot_path = ut.make_file_paths(base_name, "plots", budget, weights, "png")
-
-    # Ensure directories exist
-    os.makedirs(os.path.dirname(pickle_path), exist_ok=True)
-    os.makedirs(os.path.dirname(plot_path), exist_ok=True)
-
-    # Save the plot and pickle
-    ut.save_plot_and_file(
-        values=values,
-        labels=labels,
-        window=30,
-        path_to_pickle=pickle_path,
-        path_to_plot=plot_path,
-    )
-
-
-def unpack_config(config: dict) -> tuple[dict, dict, dict, int, dict]:
-    """Complete."""
-    # Weights of the objective function
-    weights = {
-        "ttt": config["TTT_weight"],
-        "individual_tt": config["individual_travel_time_weight"],
-        "individual_emissions": config["emissions_weight"],
-        "total_emissions": config["total_emissions_weight"],
-    }
-
-    # RL hyper-parameters
-    hyperparams = {
-        "epsilon": config["epsilon"],
-        "decay": config["decay"],
-        "alpha": config["alpha"],
-    }
-
-    # Dictionary with all paths
-    paths_dict = config["paths_dict"]
-    # Define edge data granularity
-    edge_data_frequency = config["edge_data_frequency"]
-    # Parameters to run SUMO
-    sumo_params = config["sumo_config"]
-
-    return weights, hyperparams, paths_dict, edge_data_frequency, sumo_params
 
 
 def main(config, total_budget: int) -> None:
@@ -82,8 +13,8 @@ def main(config, total_budget: int) -> None:
     :param total_budget: Total budget.
     """
     # Unpack configuration file
-    weights, hyperparams, paths_dict, edge_data_frequency, sumo_params = unpack_config(
-        config
+    weights, hyperparams, paths_dict, edge_data_frequency, sumo_params = (
+        ut.unpack_config(config)
     )
 
     # Initialise all drivers
@@ -153,8 +84,10 @@ def main(config, total_budget: int) -> None:
         )
 
     # Save the plot and pickle file for TTT and emissions
-    save_metric(ttts, labels_dict, "exp_replay_ttt", "TTT [h]", total_budget, weights)
-    save_metric(
+    ut.save_metric(
+        ttts, labels_dict, "exp_replay_ttt", "TTT [h]", total_budget, weights
+    )
+    ut.save_metric(
         emissions_total,
         labels_dict,
         "exp_replay_emissions",
