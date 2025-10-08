@@ -109,6 +109,7 @@ class Driver:
         :param costs: The costs of the routes after adjusting.
         :return: Route index.
         """
+        costs = np.array(costs)
         if strategy == "argmin":
             return int(np.argmin(costs))
 
@@ -156,6 +157,7 @@ def policy_no_incentives(drivers: list[Driver], epsilon: float) -> tuple[dict, d
         for when no incentives are applied.
 
     :param drivers: List of objects of type StateDriver.
+    :param epsilon: Epsilon parameter.
     :return: Tuple containing:
              - route_edges: mapping trip_id to selected route edges
              - actions_index: mapping trip_id to selected (route_idx, incentive_level)
@@ -168,6 +170,100 @@ def policy_no_incentives(drivers: list[Driver], epsilon: float) -> tuple[dict, d
             epsilon=epsilon
         )
 
+        route_edges[driver.trip_id] = selected_edges
+        actions_index[driver.trip_id] = selected_index
+
+    return route_edges, actions_index
+
+
+def initialise_drivers(
+    actions_file_path: str,
+    incentives_mode: bool,
+    strategy: str,
+) -> list[Driver]:
+    """
+    Initialise all the drivers of type StateDriver.
+
+    :param actions_file_path: Path to the XML file.
+    :param incentives_mode: Whether the incentives are applied.
+    :param strategy: Strategy used to select routes.
+    :return: A list of drivers of type StateDriver.
+    """
+    drivers = []
+
+    tree = ET.parse(actions_file_path)
+    root = tree.getroot()
+
+    # Loop through all the vehicles
+    for vehicle in root.findall("vehicle"):
+        routes = []
+        costs = []
+        route_distribution = vehicle.find("routeDistribution")
+        if route_distribution is not None:
+            # Loop through all routes for the given vehicle
+            for i, route in enumerate(route_distribution.findall("route")):
+                routes.append((i, route.get("edges", "").split()))
+                costs.append(float(route.get("cost", "0")))
+
+            drivers.append(
+                Driver(
+                    trip_id=vehicle.get("id"),
+                    routes=routes,
+                    costs=costs,
+                    strategy=strategy,
+                    incentives_mode=incentives_mode,
+                )
+            )
+    return drivers
+
+
+def policy_incentives(
+    drivers: list[Driver],
+    total_budget: float,
+    epsilon: float,
+    compliance_rate: bool = False,
+) -> tuple[dict, dict]:
+    """
+    Policy function for the RL algorithm using epsilon-greedy strategy
+        for when incentives are applied.
+
+    :param drivers: List of objects of type StateDriver.
+    :param total_budget: Maximum total incentive budget.
+    :param epsilon: Probability to select a random action.
+    :param compliance_rate: True if using compliance rate, False otherwise.
+    :return: Tuple containing:
+             - route_edges: mapping trip_id to selected route edges
+             - actions_index: mapping trip_id to selected (route_idx, incentive_level)
+    """
+    route_edges = {}
+    actions_index = {}
+    current_budget = 0
+
+    for driver in drivers:
+        # Select action using epsilon-greedy strategy
+        selected_edges, selected_action, selected_index, incentive = (
+            driver.eps_greedy_policy_incentives(epsilon=epsilon)
+        )
+
+        # Set random number if using compliance rate
+        if compliance_rate:
+            if _rng.random() >= 0.8:
+                selected_action = driver.route_selection_strategy(
+                    driver.strategy, driver.costs
+                )
+                selected_edges = driver.routes[selected_action][1]
+                incentive = 0
+
+        # If there is no budget left, select route according to route strategy
+        if current_budget + incentive > total_budget:
+            selected_action = driver.route_selection_strategy(
+                driver.strategy, driver.costs
+            )
+            selected_edges = driver.routes[selected_action][1]
+            incentive = 0
+
+        # Update budget and tracking dictionaries
+        current_budget += incentive
         route_edges[driver.trip_id] = selected_edges
         actions_index[driver.trip_id] = selected_index
 
@@ -302,44 +398,6 @@ class StateDriver:
         )
 
 
-def policy_incentives(
-    drivers: list[Driver], total_budget: float, epsilon: float
-) -> tuple[dict, dict]:
-    """
-    Policy function for the RL algorithm using epsilon-greedy strategy
-        for when incentives are applied.
-
-    :param drivers: List of objects of type StateDriver.
-    :param total_budget: Maximum total incentive budget.
-    :param epsilon: Probability to select a random action.
-    :return: Tuple containing:
-             - route_edges: mapping trip_id to selected route edges
-             - actions_index: mapping trip_id to selected (route_idx, incentive_level)
-    """
-    route_edges = {}
-    actions_index = {}
-    current_budget = 0
-
-    for driver in drivers:
-        # Select action using epsilon-greedy strategy
-        selected_edges, selected_action, selected_index, incentive = (
-            driver.eps_greedy_policy_incentives(epsilon=epsilon)
-        )
-
-        # If there is no budget left, select route according to route strategy
-        if current_budget + incentive > total_budget:
-            selected_action = driver.route_selection_strategy(driver.strategy)
-            selected_edges = driver.routes[selected_action][1]
-            incentive = 0
-
-        # Update budget and tracking dictionaries
-        current_budget += incentive
-        route_edges[driver.trip_id] = selected_edges
-        actions_index[driver.trip_id] = selected_index
-
-    return route_edges, actions_index
-
-
 def policy_incentives_state(
     drivers: list[StateDriver], total_budget: float, epsilon: float
 ) -> tuple[dict, dict]:
@@ -383,47 +441,6 @@ def policy_incentives_state(
         actions_index[driver.trip_id] = selected_index
 
     return route_edges, actions_index
-
-
-def initialise_drivers(
-    actions_file_path: str,
-    incentives_mode: bool,
-    strategy: str,
-) -> list[Driver]:
-    """
-    Initialise all the drivers of type StateDriver.
-
-    :param actions_file_path: Path to the XML file.
-    :param incentives_mode: Whether the incentives are applied.
-    :param strategy: Strategy used to select routes.
-    :return: A list of drivers of type StateDriver.
-    """
-    drivers = []
-
-    tree = ET.parse(actions_file_path)
-    root = tree.getroot()
-
-    # Loop through all the vehicles
-    for vehicle in root.findall("vehicle"):
-        routes = []
-        costs = []
-        route_distribution = vehicle.find("routeDistribution")
-        if route_distribution is not None:
-            # Loop through all routes for the given vehicle
-            for i, route in enumerate(route_distribution.findall("route")):
-                routes.append((i, route.get("edges", "").split()))
-                costs.append(float(route.get("cost", "0")))
-
-            drivers.append(
-                Driver(
-                    trip_id=vehicle.get("id"),
-                    routes=routes,
-                    costs=costs,
-                    strategy=strategy,
-                    incentives_mode=incentives_mode,
-                )
-            )
-    return drivers
 
 
 def initialise_drivers_state(

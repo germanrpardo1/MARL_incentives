@@ -1,6 +1,10 @@
 # Number of training episodes for the RL agent
 episodes: 500
 
+
+# True if using compliance rate, false otherwise
+compliance_rate: true
+
 ### Weights for different components of the reward/cost function
 # Weight for Total Travel Time (TTT) of the network
 TTT_weight: 0
@@ -10,6 +14,10 @@ individual_travel_time_weight: 1
 emissions_weight: 0
 # Total emissions weight
 total_emissions_weight: 0
+
+# Buffer capacity for experience replay
+buffer_capacity: 100
+batch_size: 32
 
 # Exploration rate for epsilon-greedy policy
 epsilon: 0.9
@@ -21,6 +29,8 @@ alpha: 0.1
 incentives_mode: true
 # Total available budget for incentives or policies (can be used as a constraint)
 total_budget:
+  - 0
+  - 50000
   - 100000000
 # Select route selection strategy
 strategy: "logit"

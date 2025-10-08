@@ -33,6 +33,8 @@ def main(config, total_budget: int) -> None:
         paths_dict=paths_dict,
         sumo_params=sumo_params,
         edge_data_frequency=edge_data_frequency,
+        buffer_capacity=config["buffer_capacity"],
+        batch_size=config["batch_size"],
     )
 
     # Train RL agent
@@ -40,7 +42,10 @@ def main(config, total_budget: int) -> None:
         # Get actions from policy based on whether incentives are used or not
         if config["incentives_mode"]:
             routes_edges, actions_index = tr.policy_incentives(
-                drivers, total_budget=total_budget, epsilon=hyperparams["epsilon"]
+                drivers,
+                total_budget=total_budget,
+                epsilon=hyperparams["epsilon"],
+                compliance_rate=config["compliance_rate"],
             )
         else:
             routes_edges, actions_index = tr.policy_no_incentives(

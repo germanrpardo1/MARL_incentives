@@ -19,6 +19,7 @@ class Network:
         sumo_params: dict,
         edge_data_frequency: int,
         buffer_capacity: int = 100,
+        batch_size: int = 32,
         state_mode: bool = False,
     ) -> None:
         """
@@ -28,12 +29,16 @@ class Network:
         :param sumo_params: SUMO simulation configuration
         :param edge_data_frequency: Frequency of edge data (in seconds)
         :param buffer_capacity: Maximum size of the replay buffer.
+        :param batch_size: Batch size for every sample taken from the buffer.
+        :param state_mode: Whether using state or not.
         """
         self.paths_dict = paths_dict
         self.sumo_params = sumo_params
         self.edge_data_frequency = edge_data_frequency
         if not state_mode:
-            self.buffer = rb.ReplayBuffer(capacity=buffer_capacity)
+            self.buffer = rb.ReplayBuffer(
+                capacity=buffer_capacity, batch_size=batch_size
+            )
         else:
             self.buffer = rb.StateReplayBuffer(capacity=buffer_capacity)
 
