@@ -3,6 +3,7 @@
 from marl_incentives import environment as env
 from marl_incentives import traveller as tr
 from marl_incentives import utils as ut
+from marl_incentives import xml_manipulation as xml
 
 
 def main(config, total_budget: int) -> None:
@@ -88,17 +89,22 @@ def main(config, total_budget: int) -> None:
             i=i, episodes=config["episodes"], hyperparams=hyperparams, ttts=ttts
         )
 
+        # Update travel times
+        ut.calculate_average_travel_time(
+            actions=actions_index, weights=xml.parse_weights("data/weights.xml")
+        )
+
     # Save the plot and pickle file for TTT and emissions
     base_name = (
         "compliance_rate_exp_replay" if config["compliance_rate"] else "exp_replay"
     )
     ut.save_metric(
-        ttts, labels_dict, base_name + "ttt", "TTT [h]", total_budget, weights
+        ttts, labels_dict, base_name + "_ttt", "TTT [h]", total_budget, weights
     )
     ut.save_metric(
         emissions_total,
         labels_dict,
-        base_name + "emissions",
+        base_name + "_emissions",
         "Emissions [kg]",
         total_budget,
         weights,

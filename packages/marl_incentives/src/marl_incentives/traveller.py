@@ -44,6 +44,28 @@ class Driver:
             else np.zeros(len(self.costs))
         )
 
+    def calculate_average_travel_time(self, weights: dict):
+        """
+        Compute the average travel time per route from all routes in the given actions.
+        """
+        avg_travel_times = {}
+
+        for route_id, route in self.routes:
+            total_edge_average = 0
+            for edge in route:
+                total_time = 0
+                count = 0
+                for _, _, travel_time in weights.get(edge, []):
+                    total_time += travel_time
+                    count += 1
+                total_edge_average += total_time / count
+            # Avoid division by zero
+            avg_travel_times[route_id] = (
+                round(total_edge_average, 2) if total_edge_average else 0
+            )
+
+        self.costs = avg_travel_times
+
     def eps_greedy_policy_no_incentives(self, epsilon: float) -> tuple[list, int]:
         """
         Epsilon-greedy policy for selecting a route without incentives.
@@ -151,6 +173,11 @@ class Driver:
         )
 
 
+def calculate_average_travel_times(drivers: list[Driver], weights):
+    for driver in drivers:
+        driver.calculate_average_travel_time(weights=weights)
+
+
 def policy_no_incentives(drivers: list[Driver], epsilon: float) -> tuple[dict, dict]:
     """
     Policy function for the RL algorithm using epsilon-greedy strategy
@@ -217,55 +244,54 @@ def initialise_drivers(
     return drivers
 
 
+def select_default_route(driver: Driver):
+    """
+    Select route based on the driver's default strategy.
+
+    :param driver: Driver object.
+    """
+    idx = driver.route_selection_strategy(driver.strategy, driver.costs)
+    return idx, driver.routes[idx][1], 0.0
+
+
 def policy_incentives(
     drivers: list[Driver],
     total_budget: float,
     epsilon: float,
     compliance_rate: bool = False,
-) -> tuple[dict, dict]:
+) -> tuple[dict[str, list], dict[str, tuple]]:
     """
-    Policy function for the RL algorithm using epsilon-greedy strategy
-        for when incentives are applied.
+    Apply an epsilon-greedy policy for route and incentive selection.
 
-    :param drivers: List of objects of type StateDriver.
+    :param drivers: List of Driver objects.
     :param total_budget: Maximum total incentive budget.
-    :param epsilon: Probability to select a random action.
-    :param compliance_rate: True if using compliance rate, False otherwise.
-    :return: Tuple containing:
-             - route_edges: mapping trip_id to selected route edges
-             - actions_index: mapping trip_id to selected (route_idx, incentive_level)
+    :param epsilon: Probability of selecting a random action.
+    :param compliance_rate: Whether to simulate compliance rate randomness.
+    :return:
+        route_edges: mapping trip_id → selected route edges
+        actions_index: mapping trip_id → (route_idx, incentive_level)
     """
+
     route_edges = {}
     actions_index = {}
-    current_budget = 0
+    current_used_budget = 0.0
 
     for driver in drivers:
-        # Select action using epsilon-greedy strategy
-        selected_edges, selected_action, selected_index, incentive = (
-            driver.eps_greedy_policy_incentives(epsilon=epsilon)
-        )
+        # --- Step 1: Base action via epsilon-greedy ---
+        edges, _, index, incentive = driver.eps_greedy_policy_incentives(epsilon)
 
-        # Set random number if using compliance rate
-        if compliance_rate:
-            if _rng.random() >= 0.8:
-                selected_action = driver.route_selection_strategy(
-                    driver.strategy, driver.costs
-                )
-                selected_edges = driver.routes[selected_action][1]
-                incentive = 0
+        # --- Step 2: Apply compliance rate randomness ---
+        if compliance_rate and _rng.random() >= 0.8:
+            _, edges, incentive = select_default_route(driver)
 
-        # If there is no budget left, select route according to route strategy
-        if current_budget + incentive > total_budget:
-            selected_action = driver.route_selection_strategy(
-                driver.strategy, driver.costs
-            )
-            selected_edges = driver.routes[selected_action][1]
-            incentive = 0
+        # --- Step 3: Enforce budget limit ---
+        if current_used_budget + incentive > total_budget:
+            _, edges, incentive = select_default_route(driver)
 
-        # Update budget and tracking dictionaries
-        current_budget += incentive
-        route_edges[driver.trip_id] = selected_edges
-        actions_index[driver.trip_id] = selected_index
+        # --- Step 4: Update trackers ---
+        current_used_budget += incentive
+        route_edges[driver.trip_id] = edges
+        actions_index[driver.trip_id] = index
 
     return route_edges, actions_index
 

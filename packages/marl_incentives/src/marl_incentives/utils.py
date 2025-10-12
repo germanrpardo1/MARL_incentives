@@ -332,36 +332,28 @@ def make_file_paths(
     return os.path.join(f"results/{subfolder}/{base_name}", filename)
 
 
-def get_travel_time(edge_id, timestamp, weights):
-    if edge_id not in weights:
-        return float(0)
+def calculate_average_travel_time(actions: dict, weights: dict) -> dict:
+    """
+    Compute the average travel time per interval (begin time)
+    from all routes in the given actions.
+    """
+    interval_times = {}
 
-    for begin, end, travel_time in weights[edge_id]:
-        if begin <= timestamp < end:
-            return travel_time
-
-    return float(0)
-
-
-def calculate_route_cost(actions, weights):
-    costs_r = {}
-
-    for i, (trip, routes) in enumerate(actions.items()):
-        trip_costs = []
+    for routes in actions.values():
         for _, route in routes:
-            timestamp = i * 0.09  # Initial departure time for each trip
-            total_cost = 0
-
             for edge in route:
-                travel_time = get_travel_time(edge, timestamp, weights)
-                total_cost += travel_time
-                timestamp += travel_time  # Update timestamp as we move through edges
+                for begin, _, travel_time in weights.get(edge, []):
+                    if begin not in interval_times:
+                        interval_times[begin] = []
+                    interval_times[begin].append(travel_time)
 
-            trip_costs.append(round(total_cost, 2))
+    # Compute averages only for intervals with data
+    avg_travel_times = {}
+    for begin, times in interval_times.items():
+        if times:
+            avg_travel_times[begin] = round(sum(times) / len(times), 2)
 
-        costs_r[trip] = trip_costs
-
-    return costs_r
+    return avg_travel_times
 
 
 def save_metric(
