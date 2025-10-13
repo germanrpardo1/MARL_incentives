@@ -90,8 +90,8 @@ def main(config, total_budget: int) -> None:
         )
 
         # Update travel times
-        ut.calculate_average_travel_time(
-            actions=actions_index, weights=xml.parse_weights("data/weights.xml")
+        tr.update_average_travel_times(
+            drivers=drivers, weights=xml.parse_weights("data/weights.xml")
         )
 
     # Save the plot and pickle file for TTT and emissions

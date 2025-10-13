@@ -332,30 +332,6 @@ def make_file_paths(
     return os.path.join(f"results/{subfolder}/{base_name}", filename)
 
 
-def calculate_average_travel_time(actions: dict, weights: dict) -> dict:
-    """
-    Compute the average travel time per interval (begin time)
-    from all routes in the given actions.
-    """
-    interval_times = {}
-
-    for routes in actions.values():
-        for _, route in routes:
-            for edge in route:
-                for begin, _, travel_time in weights.get(edge, []):
-                    if begin not in interval_times:
-                        interval_times[begin] = []
-                    interval_times[begin].append(travel_time)
-
-    # Compute averages only for intervals with data
-    avg_travel_times = {}
-    for begin, times in interval_times.items():
-        if times:
-            avg_travel_times[begin] = round(sum(times) / len(times), 2)
-
-    return avg_travel_times
-
-
 def save_metric(
     values: list[float],
     labels: dict,

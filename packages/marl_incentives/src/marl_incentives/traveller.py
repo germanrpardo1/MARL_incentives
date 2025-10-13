@@ -44,28 +44,6 @@ class Driver:
             else np.zeros(len(self.costs))
         )
 
-    def calculate_average_travel_time(self, weights: dict):
-        """
-        Compute the average travel time per route from all routes in the given actions.
-        """
-        avg_travel_times = {}
-
-        for route_id, route in self.routes:
-            total_edge_average = 0
-            for edge in route:
-                total_time = 0
-                count = 0
-                for _, _, travel_time in weights.get(edge, []):
-                    total_time += travel_time
-                    count += 1
-                total_edge_average += total_time / count
-            # Avoid division by zero
-            avg_travel_times[route_id] = (
-                round(total_edge_average, 2) if total_edge_average else 0
-            )
-
-        self.costs = avg_travel_times
-
     def eps_greedy_policy_no_incentives(self, epsilon: float) -> tuple[list, int]:
         """
         Epsilon-greedy policy for selecting a route without incentives.
@@ -172,10 +150,40 @@ class Driver:
             + weights["total_emissions"] * total_em
         )
 
+    def update_average_travel_time(self, weights: dict):
+        """
+        Compute the average travel time per route from all available routes.
 
-def calculate_average_travel_times(drivers: list[Driver], weights):
+        :param weights: Dictionary containing all the edge's travel times.
+        """
+        avg_travel_times = {}
+
+        for route_id, route in self.routes:
+            total_edge_average = 0
+            for edge in route:
+                total_time = 0
+                count = 0
+                for _, _, travel_time in weights.get(edge, []):
+                    total_time += travel_time
+                    count += 1
+                total_edge_average += total_time / count
+            # Avoid division by zero
+            avg_travel_times[route_id] = (
+                round(total_edge_average, 2) if total_edge_average else 0
+            )
+
+        self.costs = avg_travel_times
+
+
+def update_average_travel_times(drivers: list[Driver], weights: dict):
+    """
+    Update the average travel time for all routes of all drivers.
+
+    :param drivers: List of drivers.
+    :param weights: Dictionary containing all the edge's travel times.
+    """
     for driver in drivers:
-        driver.calculate_average_travel_time(weights=weights)
+        driver.update_average_travel_time(weights=weights)
 
 
 def policy_no_incentives(drivers: list[Driver], epsilon: float) -> tuple[dict, dict]:
