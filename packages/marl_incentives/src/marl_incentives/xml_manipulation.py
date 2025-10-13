@@ -192,9 +192,10 @@ def parse_weights(xml_file):
         begin, end = float(interval.get("begin")), float(interval.get("end"))
         for edge in interval.findall(".//edge"):
             edge_id = edge.get("id")
-            travel_time = float(edge.get("traveltime"))
+            travel_time = edge.get("traveltime")
             if edge_id not in weights:
                 weights[edge_id] = []
-            weights[edge_id].append((begin, end, travel_time))
+            if travel_time:
+                weights[edge_id].append((begin, end, float(travel_time)))
 
     return weights

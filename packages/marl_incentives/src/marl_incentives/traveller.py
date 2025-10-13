@@ -156,7 +156,7 @@ class Driver:
 
         :param weights: Dictionary containing all the edge's travel times.
         """
-        avg_travel_times = {}
+        avg_travel_times = []
 
         for route_id, route in self.routes:
             total_edge_average = 0
@@ -164,11 +164,11 @@ class Driver:
                 total_time = 0
                 count = 0
                 for _, _, travel_time in weights.get(edge, []):
-                    total_time += travel_time
-                    count += 1
+                    total_time += travel_time if travel_time else 0
+                    count += 1 if travel_time else 0
                 total_edge_average += total_time / count
             # Avoid division by zero
-            avg_travel_times[route_id] = (
+            avg_travel_times.append(
                 round(total_edge_average, 2) if total_edge_average else 0
             )
 
