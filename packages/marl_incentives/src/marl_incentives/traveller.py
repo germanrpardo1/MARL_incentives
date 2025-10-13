@@ -289,8 +289,16 @@ def policy_incentives(
         edges, _, index, incentive = driver.eps_greedy_policy_incentives(epsilon)
 
         # --- Step 2: Apply compliance rate randomness ---
-        if compliance_rate and _rng.random() >= 0.8:
-            _, edges, incentive = select_default_route(driver)
+        # Only applies for when incentives are assigned
+        if index < len(driver.costs):
+            # Hard-coding coefficients of the logit model
+            coefficients = [1.99, -0.23]
+            # Only feature at the moment: time sacrifice in minutes
+            x = [(driver.costs[index] - min(driver.costs)) / 60]  # In minutes
+            # Probability of accepting incentivised path
+            prob = logistic_prob(x, coefficients)
+            if compliance_rate and _rng.random() >= prob:
+                _, edges, incentive = select_default_route(driver)
 
         # --- Step 3: Enforce budget limit ---
         if current_used_budget + incentive > total_budget:
@@ -302,6 +310,27 @@ def policy_incentives(
         actions_index[driver.trip_id] = index
 
     return route_edges, actions_index
+
+
+def logistic_prob(x: list, coefficients: list) -> np.ndarray:
+    """
+    Compute logistic regression probabilities given features and coefficients.
+
+    :param x: Feature matrix (shape: [n_samples, n_features]).
+               Should NOT include an intercept column.
+    :param coefficients: Model coefficients, including intercept as the first element.
+                         Example: [intercept, beta1, beta2, ...]
+    :return: Predicted probabilities for each sample.
+    """
+    x = np.asarray(x)
+    coef = np.asarray(coefficients)
+
+    intercept = coef[0]
+    betas = coef[1:]
+
+    linear_combination = intercept + np.dot(x, betas)
+    probs = 1 / (1 + np.exp(-linear_combination))
+    return probs
 
 
 class StateDriver:
