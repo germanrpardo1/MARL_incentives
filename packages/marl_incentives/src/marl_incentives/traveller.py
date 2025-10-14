@@ -290,14 +290,15 @@ def policy_incentives(
 
         # --- Step 2: Apply compliance rate randomness ---
         # Only applies for when incentives are assigned
-        if index < len(driver.costs):
+        if index < len(driver.costs) and compliance_rate:
             # Hard-coding coefficients of the logit model
             coefficients = [1.99, -0.23]
             # Only feature at the moment: time sacrifice in minutes
             x = [(driver.costs[index] - min(driver.costs)) / 60]  # In minutes
             # Probability of accepting incentivised path
             prob = logistic_prob(x, coefficients)
-            if compliance_rate and _rng.random() >= prob:
+            if _rng.random() >= prob:
+                # Route not accepted, select shortest path
                 _, edges, incentive = select_default_route(driver)
 
         # --- Step 3: Enforce budget limit ---

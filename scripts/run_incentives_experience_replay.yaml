@@ -3,7 +3,7 @@ episodes: 500
 
 
 # True if using compliance rate, false otherwise
-compliance_rate: false
+compliance_rate: true
 
 ### Weights for different components of the reward/cost function
 # Weight for Total Travel Time (TTT) of the network
