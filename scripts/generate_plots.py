@@ -66,6 +66,6 @@ def plot_multiple_budgets(config_file: dict) -> None:
 
 if __name__ == "__main__":
     # Load config_file
-    config = ut.load_config(path="scripts/plots_config.yaml")
+    config = ut.load_config(path="scripts/generate_plots.yaml")
 
     plot_multiple_budgets(config)
