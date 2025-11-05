@@ -1,55 +1,19 @@
-"""This script runs the MARL algorithm with and without incentives."""
-
-import os
+"""
+This script runs the multi-agent Reinforcement Learning Q-Learning
+with and without incentives (this can be changed in the config).
+It does not use experience replay, and it does not have a state
+variable. It is the original algorithm.
+"""
 
 from marl_incentives import environment as env
 from marl_incentives import traveller as tr
 from marl_incentives import utils as ut
-
-
-def save_metric(
-    values: list[float],
-    labels: dict,
-    base_name: str,
-    y_label: str,
-    budget: int,
-    weights: dict,
-) -> None:
-    """
-    Save a plot and corresponding pickle file for a given metric using
-        consistent naming conventions.
-
-    :param values: List of metric values over time (e.g., per episode).
-    :param labels: Dictionary of plot labels (e.g., title, y-axis label).
-    :param base_name: The metric name (used in file naming and plot title).
-    :param y_label: Y-axis label for the plot.
-    :param budget: Total budget used in the experiment.
-    :param weights: Dictionary of weights used in the experiment.
-    """
-    labels["title"] = f"{base_name.replace('_', ' ').title()} per episode"
-    labels["y_label"] = y_label
-
-    # Generate file paths
-    pickle_path = ut.make_file_paths(base_name, "pickle_files", budget, weights, "pkl")
-    plot_path = ut.make_file_paths(base_name, "plots", budget, weights, "png")
-
-    # Ensure directories exist
-    os.makedirs(os.path.dirname(pickle_path), exist_ok=True)
-    os.makedirs(os.path.dirname(plot_path), exist_ok=True)
-
-    # Save the plot and pickle
-    ut.save_plot_and_file(
-        values=values,
-        labels=labels,
-        window=30,
-        path_to_pickle=pickle_path,
-        path_to_plot=plot_path,
-    )
+from marl_incentives import xml_manipulation as xml
 
 
 def main(config, total_budget: int) -> None:
     """
-    Run the MARL algorithm with or without incentives with experience replay.
+    Run the MARL algorithm with or without incentives.
 
     :param config: Configuration dictionary.
     :param total_budget: Total budget.
@@ -94,19 +58,22 @@ def main(config, total_budget: int) -> None:
         edge_data_frequency=edge_data_frequency,
     )
 
-    # Train RL agent
+    # Start training loop for RL agents
     for i in range(config["episodes"]):
-        # Get actions from policy based on whether incentives are used or not
+        # Take action from policy for every driver with incentives mode
         if config["incentives_mode"]:
             routes_edges, actions_index = tr.policy_incentives(
-                drivers, total_budget=total_budget, epsilon=hyperparams["epsilon"]
+                drivers=drivers,
+                total_budget=total_budget,
+                epsilon=hyperparams["epsilon"],
             )
+        # Take action from policy for every driver without incentives mode
         else:
             routes_edges, actions_index = tr.policy_no_incentives(
-                drivers, hyperparams["epsilon"]
+                drivers=drivers, epsilon=hyperparams["epsilon"]
             )
 
-        # Perform actions given by policy
+        # Perform actions for each driver
         total_tt, ind_tt, ind_em, total_em = network_env.step(
             routes_edges=routes_edges,
         )
@@ -115,18 +82,19 @@ def main(config, total_budget: int) -> None:
         ttts.append(total_tt)
         emissions_total.append(total_em)
 
-        # For each agent update Q function
-        # Q(a) = (1 - alpha) * Q(a) + alpha * r
+        # Update Q function for each agent
         for driver in drivers:
             idx = actions_index[driver.trip_id]
+
             # Compute reward
             reward = driver.compute_reward(ind_tt, ind_em, total_tt, total_em, weights)
-            # Update Q-value
+
+            # Update Q-value: Q(a) = (1 - alpha) * Q(a) + alpha * r
             driver.q_values[idx] = (1 - hyperparams["alpha"]) * driver.q_values[
                 idx
             ] + hyperparams["alpha"] * reward
 
-        # Logging
+        # Log progress
         ut.log_progress(
             i=i, episodes=config["episodes"], hyperparams=hyperparams, ttts=ttts
         )
@@ -136,12 +104,14 @@ def main(config, total_budget: int) -> None:
             0.01, hyperparams["epsilon"] * hyperparams["decay"]
         )
 
-        # Retrieve updated route costs
-        # costs = calculate_route_cost(actions, parse_weights("data/weights.xml"))
+        # Update travel times
+        tr.update_average_travel_times(
+            drivers=drivers, weights=xml.parse_weights("data/weights.xml")
+        )
 
     # Save the plot and pickle file for TTT and emissions
-    save_metric(ttts, labels_dict, "ttt", "TTT [h]", total_budget, weights)
-    save_metric(
+    ut.save_metric(ttts, labels_dict, "ttt", "TTT [h]", total_budget, weights)
+    ut.save_metric(
         emissions_total,
         labels_dict,
         "emissions",

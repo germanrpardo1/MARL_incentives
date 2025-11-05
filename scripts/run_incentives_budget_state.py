@@ -1,4 +1,10 @@
-"""This script runs the MARL algorithm with and without incentives."""
+"""
+This script runs the multi-agent Reinforcement Learning DQN
+with incentives.
+It is an adaptation of DQN for one-step MDPs, so there is no target network.
+It uses experience replay to accelerate learning, and the available budget
+is the state variable.
+"""
 
 import numpy as np
 import torch
@@ -10,7 +16,7 @@ from marl_incentives import utils as ut
 
 def main(config, total_budget: int) -> None:
     """
-    Run the MARL algorithm with or without incentives with experience replay.
+    Run the MARL algorithm with incentives using DQN.
 
     :param config: Configuration dictionary.
     :param total_budget: Total budget.

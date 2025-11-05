@@ -1,4 +1,9 @@
-"""This script runs the MARL algorithm with and without incentives."""
+"""
+This script runs the multi-agent Reinforcement Learning Q-Learning
+with and without incentives (this can be changed in the config).
+It uses experience replay to accelerate learning, and it does not have
+a state variable.
+"""
 
 from marl_incentives import environment as env
 from marl_incentives import traveller as tr
@@ -38,9 +43,9 @@ def main(config, total_budget: int) -> None:
         batch_size=config["batch_size"],
     )
 
-    # Train RL agent
+    # Start training loop for RL agents
     for i in range(config["episodes"]):
-        # Get actions from policy based on whether incentives are used or not
+        # Get action from policy for every driver with incentives mode
         if config["incentives_mode"]:
             routes_edges, actions_index = tr.policy_incentives(
                 drivers,
@@ -48,6 +53,7 @@ def main(config, total_budget: int) -> None:
                 epsilon=hyperparams["epsilon"],
                 compliance_rate=config["compliance_rate"],
             )
+        # Take action from policy for every driver without incentives mode
         else:
             routes_edges, actions_index = tr.policy_no_incentives(
                 drivers, hyperparams["epsilon"]
@@ -67,6 +73,7 @@ def main(config, total_budget: int) -> None:
 
         # If there are enough observations in the buffer, sample and update Qs
         if len(network_env.buffer) >= network_env.buffer.batch_size:
+            # Sample past observations from replay buffer
             acts, rewards = network_env.buffer.sample(network_env.buffer.batch_size)
             for a, r in zip(acts, rewards):
                 # For each agent update Q function
@@ -84,7 +91,7 @@ def main(config, total_budget: int) -> None:
                     0.01, hyperparams["epsilon"] * hyperparams["decay"]
                 )
 
-        # Logging
+        # Log progress
         ut.log_progress(
             i=i, episodes=config["episodes"], hyperparams=hyperparams, ttts=ttts
         )
