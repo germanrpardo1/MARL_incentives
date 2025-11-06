@@ -120,7 +120,7 @@ def main(config, total_budget: int) -> None:
 
 if __name__ == "__main__":
     # Load config
-    config_file = ut.load_config(path="scripts/run_incentives_experience_replay.yaml")
+    config_file = ut.load_config(path="scripts/qlearning_no_state_exp_replay.yaml")
 
     # Loop for different budgets
     for tot_budget in config_file["total_budget"]:
