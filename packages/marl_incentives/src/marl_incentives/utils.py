@@ -3,7 +3,6 @@
 import os
 import pickle
 import sys
-from typing import Dict, List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -83,7 +82,7 @@ def smooth_curve(values: np.ndarray, window_size: int) -> tuple[np.ndarray, np.n
     return x, smoothed
 
 
-def load_pickle_array(path: str) -> Optional[np.ndarray]:
+def load_pickle_array(path: str) -> np.ndarray | None:
     """
     Load a numpy array from a pickle file.
 
@@ -105,8 +104,8 @@ def load_pickle_array(path: str) -> Optional[np.ndarray]:
 def plot_multiple_curves(
     title: str,
     y_label: str,
-    budgets: List[int],
-    weights: Dict,
+    budgets: list[int],
+    weights: dict,
     base_name: str,
     baseline_path: str,
     window_size: int = 30,
@@ -183,8 +182,8 @@ def plot_multiple_curves(
 
 
 def plot_weight_sensitivity(
-    weights_list: List[Dict],
-    budgets: List[int],
+    weights_list: list[dict],
+    budgets: list[int],
     ttt_base_name: str,
     emissions_base_name: str,
     window_size: int = 100,
@@ -205,8 +204,8 @@ def plot_weight_sensitivity(
     save_path += "." + ext
 
     def compute_mean(
-        base_name: str, weights: Dict, budget: int, label: str
-    ) -> Optional[float]:
+        base_name: str, weights: dict, budget: int, label: str
+    ) -> float | None:
         """Helper to compute the mean of the last window_size entries from a pickle file."""
         path = make_file_paths(
             base_name=base_name,
@@ -401,3 +400,35 @@ def unpack_config(config: dict) -> tuple[dict, dict, dict, int, dict]:
     sumo_params = config["sumo_config"]
 
     return weights, hyperparams, paths_dict, edge_data_frequency, sumo_params
+
+
+def update_average_travel_times(drivers: list, weights: dict):
+    """
+    Update the average travel time for all routes of all drivers.
+
+    :param drivers: List of drivers.
+    :param weights: Dictionary containing all the edge's travel times.
+    """
+    for driver in drivers:
+        driver.update_average_travel_time(weights=weights)
+
+
+def logistic_prob(x: list, coefficients: list) -> np.ndarray:
+    """
+    Compute logistic regression probabilities given features and coefficients.
+
+    :param x: Feature matrix (shape: [n_samples, n_features]).
+               Should NOT include an intercept column.
+    :param coefficients: Model coefficients, including intercept as the first element.
+                         Example: [intercept, beta1, beta2, ...]
+    :return: Predicted probabilities for each sample.
+    """
+    x = np.asarray(x)
+    coef = np.asarray(coefficients)
+
+    intercept = coef[0]
+    betas = coef[1:]
+
+    linear_combination = intercept + np.dot(x, betas)
+    probs = 1 / (1 + np.exp(-linear_combination))
+    return probs

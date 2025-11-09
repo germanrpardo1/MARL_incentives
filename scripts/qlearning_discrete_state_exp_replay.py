@@ -26,8 +26,9 @@ def main(config, total_budget: int) -> None:
     # Initialise all drivers
     drivers = tr.initialise_drivers(
         actions_file_path=paths_dict["output_rou_alt_path"],
-        incentives_mode=config["incentives_mode"],
+        incentives_mode=True,
         strategy=config["strategy"],
+        state_variable=True,
     )
 
     ttts = []
@@ -45,19 +46,13 @@ def main(config, total_budget: int) -> None:
 
     # Start training loop for RL agents
     for i in range(config["episodes"]):
-        # Get action from policy for every driver with incentives mode
-        if config["incentives_mode"]:
-            routes_edges, actions_index = tr.policy_incentives(
-                drivers,
-                total_budget=total_budget,
-                epsilon=hyperparams["epsilon"],
-                compliance_rate=config["compliance_rate"],
-            )
-        # Take action from policy for every driver without incentives mode
-        else:
-            routes_edges, actions_index = tr.policy_no_incentives(
-                drivers, hyperparams["epsilon"]
-            )
+        # Get action from policy for every driver
+        routes_edges, actions_index = tr.policy_incentives_discrete_state(
+            drivers,
+            total_budget=total_budget,
+            epsilon=hyperparams["epsilon"],
+            compliance_rate=config["compliance_rate"],
+        )
 
         # Perform actions given by policy
         total_tt, ind_tt, ind_em, total_em = network_env.step(
@@ -97,7 +92,7 @@ def main(config, total_budget: int) -> None:
         )
 
         # Update travel times
-        tr.update_average_travel_times(
+        ut.update_average_travel_times(
             drivers=drivers, weights=xml.parse_weights("data/weights.xml")
         )
 

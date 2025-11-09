@@ -105,7 +105,7 @@ def main(config, total_budget: int) -> None:
         )
 
         # Update travel times
-        tr.update_average_travel_times(
+        ut.update_average_travel_times(
             drivers=drivers, weights=xml.parse_weights("data/weights.xml")
         )
 

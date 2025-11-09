@@ -7,6 +7,8 @@ import torch
 import torch.optim as optim
 from dqn_neural_network import DQN
 
+from marl_incentives import utils as ut
+
 # Initialise a random generator instance
 _rng = np.random.default_rng()
 
@@ -20,6 +22,7 @@ class Driver:
         routes: list[tuple[int, list]],
         costs: list,
         incentives_mode: bool,
+        state_variable: bool = False,
         strategy: str = "argmin",
     ) -> None:
         """
@@ -28,21 +31,24 @@ class Driver:
         :param trip_id: The trip ID.
         :param routes: The routes of the driver. Each entry of the form (index, edges).
         :param costs: The costs of the routes.
-        :param incentives_mode: Whether the driver should include incentives or not.
+        :param incentives_mode: True if the driver should include incentives, False otherwise.
+        :param state_variable: True if using state variable, False otherwise.
         :param strategy: The strategy to assign routes.
         """
         self.trip_id = trip_id
         self.routes = routes
         self.costs = costs
         self.strategy = strategy
+
         # Initialise the Q-table
-        self.q_values = (
-            # Q table for incentives mode
-            np.zeros((len(self.costs) + 1))
-            if incentives_mode
-            # Q table for no incentives
-            else np.zeros(len(self.costs))
-        )
+        if incentives_mode and state_variable:
+            self.q_values = np.zeros((10, len(self.costs) + 1))
+        elif incentives_mode and not state_variable:
+            self.q_values = np.zeros((len(self.costs) + 1))
+        elif not incentives_mode and state_variable:
+            self.q_values = np.zeros((10, len(self.costs)))
+        else:
+            self.q_values = np.zeros(len(self.costs))
 
     def eps_greedy_policy_no_incentives(self, epsilon: float) -> tuple[list, int]:
         """
@@ -69,6 +75,7 @@ class Driver:
         """
         Epsilon-greedy policy for selecting a route with incentives.
 
+        :param epsilon: Probability of taking a random action.
         :return: (route_edges, selected_action, action_index, applied_incentive)
         """
         num_routes = len(self.costs)
@@ -80,6 +87,46 @@ class Driver:
         # Perform action with maximum Q-value with probability 1 - epsilon
         else:
             action_index = np.argmin(self.q_values)
+
+        adjusted_costs = self.costs.copy()
+        # Compute incentive to apply
+        if action_index < num_routes:
+            incentive = self.costs[action_index] - min(self.costs) + 1
+            # Apply incentive to cost
+            adjusted_costs[action_index] -= incentive
+        else:
+            incentive = 0
+
+        # Choose the route with the minimum adjusted cost
+        # Here, the route selection strategy should always be minimum cost
+        # as we assume that travellers take the incentivised route deterministically
+        # when participation rate is added, this will need modification
+        selected_action = self.route_selection_strategy(
+            strategy="argmin", costs=adjusted_costs
+        )
+        route_edges = self.routes[selected_action][1]
+
+        return route_edges, selected_action, action_index, incentive
+
+    def eps_greedy_policy_incentives_discrete_state(
+        self, epsilon: float, n: int
+    ) -> tuple[list, int, int, float]:
+        """
+        Epsilon-greedy policy for selecting a route with incentives.
+
+        :param epsilon: Probability of taking a random action.
+        :param n: Current discrete state of the driver - available budget.
+        :return: (route_edges, selected_action, action_index, applied_incentive)
+        """
+        num_routes = len(self.costs)
+
+        # Perform random action with probability epsilon
+        if _rng.random() <= epsilon:
+            random_int = _rng.integers(num_routes + 1)
+            action_index = int(random_int)  # Random action index
+        # Perform action with maximum Q-value with probability 1 - epsilon
+        else:
+            action_index = np.argmin(self.q_values[n])
 
         adjusted_costs = self.costs.copy()
         # Compute incentive to apply
@@ -175,17 +222,6 @@ class Driver:
         self.costs = avg_travel_times
 
 
-def update_average_travel_times(drivers: list[Driver], weights: dict):
-    """
-    Update the average travel time for all routes of all drivers.
-
-    :param drivers: List of drivers.
-    :param weights: Dictionary containing all the edge's travel times.
-    """
-    for driver in drivers:
-        driver.update_average_travel_time(weights=weights)
-
-
 def policy_no_incentives(drivers: list[Driver], epsilon: float) -> tuple[dict, dict]:
     """
     Policy function for the RL algorithm using epsilon-greedy strategy
@@ -215,6 +251,7 @@ def initialise_drivers(
     actions_file_path: str,
     incentives_mode: bool,
     strategy: str,
+    state_variable: bool = False,
 ) -> list[Driver]:
     """
     Initialise all the drivers of type DQNStateDriver.
@@ -222,6 +259,7 @@ def initialise_drivers(
     :param actions_file_path: Path to the XML file.
     :param incentives_mode: Whether the incentives are applied.
     :param strategy: Strategy used to select routes.
+    :param state_variable: True if using state variable, False otherwise.
     :return: A list of drivers of type DQNStateDriver.
     """
     drivers = []
@@ -247,6 +285,7 @@ def initialise_drivers(
                     costs=costs,
                     strategy=strategy,
                     incentives_mode=incentives_mode,
+                    state_variable=state_variable,
                 )
             )
     return drivers
@@ -296,7 +335,7 @@ def policy_incentives(
             # Only feature at the moment: time sacrifice in minutes
             x = [(driver.costs[index] - min(driver.costs)) / 60]  # In minutes
             # Probability of accepting incentivised path
-            prob = logistic_prob(x, coefficients)
+            prob = ut.logistic_prob(x, coefficients)
             if _rng.random() >= prob:
                 # Route not accepted, select shortest path
                 _, edges, incentive = select_default_route(driver)
@@ -313,25 +352,59 @@ def policy_incentives(
     return route_edges, actions_index
 
 
-def logistic_prob(x: list, coefficients: list) -> np.ndarray:
+def policy_incentives_discrete_state(
+    drivers: list[Driver],
+    total_budget: float,
+    epsilon: float,
+    compliance_rate: bool = False,
+) -> tuple[dict[str, list], dict[str, tuple]]:
     """
-    Compute logistic regression probabilities given features and coefficients.
+    Apply an epsilon-greedy policy for route and incentive selection.
 
-    :param x: Feature matrix (shape: [n_samples, n_features]).
-               Should NOT include an intercept column.
-    :param coefficients: Model coefficients, including intercept as the first element.
-                         Example: [intercept, beta1, beta2, ...]
-    :return: Predicted probabilities for each sample.
+    :param drivers: List of Driver objects.
+    :param total_budget: Maximum total incentive budget.
+    :param epsilon: Probability of selecting a random action.
+    :param compliance_rate: Whether to simulate compliance rate randomness.
+    :return:
+        route_edges: mapping trip_id → selected route edges
+        actions_index: mapping trip_id → (route_idx, incentive_level)
     """
-    x = np.asarray(x)
-    coef = np.asarray(coefficients)
 
-    intercept = coef[0]
-    betas = coef[1:]
+    route_edges = {}
+    actions_index = {}
+    current_used_budget = 0.0
 
-    linear_combination = intercept + np.dot(x, betas)
-    probs = 1 / (1 + np.exp(-linear_combination))
-    return probs
+    for driver in drivers:
+        state = total_budget - current_used_budget
+        n = int(np.floor((state / total_budget) * 10))
+        # --- Step 1: Base action via epsilon-greedy ---
+        edges, _, index, incentive = driver.eps_greedy_policy_incentives_discrete_state(
+            epsilon, n
+        )
+
+        # --- Step 2: Apply compliance rate randomness ---
+        # Only applies for when incentives are assigned
+        if index < len(driver.costs) and compliance_rate:
+            # Hard-coding coefficients of the logit model
+            coefficients = [1.99, -0.23]
+            # Only feature at the moment: time sacrifice in minutes
+            x = [(driver.costs[index] - min(driver.costs)) / 60]  # In minutes
+            # Probability of accepting incentivised path
+            prob = ut.logistic_prob(x, coefficients)
+            if _rng.random() >= prob:
+                # Route not accepted, select shortest path
+                _, edges, incentive = select_default_route(driver)
+
+        # --- Step 3: Enforce budget limit ---
+        if current_used_budget + incentive > total_budget:
+            _, edges, incentive = select_default_route(driver)
+
+        # --- Step 4: Update trackers ---
+        current_used_budget += incentive
+        route_edges[driver.trip_id] = edges
+        actions_index[driver.trip_id] = index
+
+    return route_edges, actions_index
 
 
 class DQNStateDriver:
