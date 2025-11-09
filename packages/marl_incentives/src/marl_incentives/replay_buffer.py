@@ -87,6 +87,21 @@ class StateReplayBuffer:
         state, actions, rewards = zip(*batch)
         return np.array(state), np.array(actions), np.array(rewards)
 
+    @staticmethod
+    def update_q_values_discrete_state(
+        drivers: list, state_index, action_index, reward, weights: dict, alpha: float
+    ):
+        """complete."""
+        total_tt, ind_tt, ind_em, total_em = reward
+        for driver in drivers:
+            idx = action_index[driver.trip_id]
+            # Compute reward
+            reward = driver.compute_reward(ind_tt, ind_em, total_tt, total_em, weights)
+            # Update Q-value
+            driver.q_values[state_index][idx] = (1 - alpha) * driver.q_values[
+                state_index
+            ][idx] + alpha * reward
+
     def __len__(self) -> int:
         """Get the size of the replay buffer."""
         return len(self.buffer)

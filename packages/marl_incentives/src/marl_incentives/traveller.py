@@ -43,10 +43,12 @@ class Driver:
         # Initialise the Q-table
         if incentives_mode and state_variable:
             self.q_values = np.zeros((10, len(self.costs) + 1))
+            self.state = 0
         elif incentives_mode and not state_variable:
             self.q_values = np.zeros((len(self.costs) + 1))
         elif not incentives_mode and state_variable:
             self.q_values = np.zeros((10, len(self.costs)))
+            self.state = 0
         else:
             self.q_values = np.zeros(len(self.costs))
 
@@ -376,7 +378,8 @@ def policy_incentives_discrete_state(
 
     for driver in drivers:
         state = total_budget - current_used_budget
-        n = int(np.floor((state / total_budget) * 10))
+        n = int(np.floor((state / total_budget) * 10) - 1)
+        driver.state = n
         # --- Step 1: Base action via epsilon-greedy ---
         edges, _, index, incentive = driver.eps_greedy_policy_incentives_discrete_state(
             epsilon, n

@@ -42,6 +42,7 @@ def main(config, total_budget: int) -> None:
         edge_data_frequency=edge_data_frequency,
         buffer_capacity=config["buffer_capacity"],
         batch_size=config["batch_size"],
+        state_mode=True,
     )
 
     # Start training loop for RL agents
@@ -60,7 +61,8 @@ def main(config, total_budget: int) -> None:
         )
 
         reward_tuple = [(60**2) * total_tt / 1100, ind_tt, ind_em, total_em]
-        network_env.buffer.push(actions_index, reward_tuple)
+        states_tuple = [driver.state for driver in drivers]
+        network_env.buffer.push(states_tuple, actions_index, reward_tuple)
 
         # Record TTT and total emissions throughout iterations
         ttts.append(total_tt)
@@ -69,12 +71,15 @@ def main(config, total_budget: int) -> None:
         # If there are enough observations in the buffer, sample and update Qs
         if len(network_env.buffer) >= network_env.buffer.batch_size:
             # Sample past observations from replay buffer
-            acts, rewards = network_env.buffer.sample(network_env.buffer.batch_size)
-            for a, r in zip(acts, rewards):
+            states, acts, rewards = network_env.buffer.sample(
+                network_env.buffer.batch_size
+            )
+            for s, a, r in zip(states, acts, rewards):
                 # For each agent update Q function
-                # Q(a) = (1 - alpha) * Q(a) + alpha * r
-                network_env.buffer.update_q_values(
+                # Q(s, a) = (1 - alpha) * Q(s, a) + alpha * r
+                network_env.buffer.update_q_values_discrete_state(
                     drivers=drivers,
+                    state_index=s,
                     action_index=a,
                     reward=r,
                     weights=weights,
