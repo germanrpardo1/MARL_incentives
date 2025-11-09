@@ -27,7 +27,7 @@ def main(config, total_budget: int) -> None:
     )
 
     # Initialise all drivers
-    drivers = tr.initialise_drivers_state(
+    drivers = tr.initialise_drivers_dqn_state(
         actions_file_path=paths_dict["output_rou_alt_path"],
         strategy=config["strategy"],
         budget=total_budget,
@@ -48,7 +48,7 @@ def main(config, total_budget: int) -> None:
     # Train RL agent
     for i in range(config["episodes"]):
         # Get actions from policy
-        routes_edges, actions_index = tr.policy_incentives_state(
+        routes_edges, actions_index = tr.policy_incentives_dqn_state(
             drivers, total_budget=total_budget, epsilon=hyperparams["epsilon"]
         )
 

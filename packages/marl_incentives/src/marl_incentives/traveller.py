@@ -191,7 +191,7 @@ def policy_no_incentives(drivers: list[Driver], epsilon: float) -> tuple[dict, d
     Policy function for the RL algorithm using epsilon-greedy strategy
         for when no incentives are applied.
 
-    :param drivers: List of objects of type StateDriver.
+    :param drivers: List of objects of type DQNStateDriver.
     :param epsilon: Epsilon parameter.
     :return: Tuple containing:
              - route_edges: mapping trip_id to selected route edges
@@ -217,12 +217,12 @@ def initialise_drivers(
     strategy: str,
 ) -> list[Driver]:
     """
-    Initialise all the drivers of type StateDriver.
+    Initialise all the drivers of type DQNStateDriver.
 
     :param actions_file_path: Path to the XML file.
     :param incentives_mode: Whether the incentives are applied.
     :param strategy: Strategy used to select routes.
-    :return: A list of drivers of type StateDriver.
+    :return: A list of drivers of type DQNStateDriver.
     """
     drivers = []
 
@@ -334,7 +334,7 @@ def logistic_prob(x: list, coefficients: list) -> np.ndarray:
     return probs
 
 
-class StateDriver:
+class DQNStateDriver:
     """Class that represents a single driver."""
 
     def __init__(
@@ -462,14 +462,14 @@ class StateDriver:
         )
 
 
-def policy_incentives_state(
-    drivers: list[StateDriver], total_budget: float, epsilon: float
+def policy_incentives_dqn_state(
+    drivers: list[DQNStateDriver], total_budget: float, epsilon: float
 ) -> tuple[dict, dict]:
     """
     Policy function for the RL algorithm using epsilon-greedy strategy
         for when incentives are applied.
 
-    :param drivers: List of objects of type StateDriver.
+    :param drivers: List of objects of type DQNStateDriver.
     :param total_budget: Maximum total incentive budget.
     :param epsilon: Probability to select a random action.
     :return: Tuple containing:
@@ -507,18 +507,18 @@ def policy_incentives_state(
     return route_edges, actions_index
 
 
-def initialise_drivers_state(
+def initialise_drivers_dqn_state(
     actions_file_path: str,
     strategy: str,
     budget: float = None,
-) -> list[StateDriver]:
+) -> list[DQNStateDriver]:
     """
-    Initialise all the drivers of type StateDriver.
+    Initialise all the drivers of type DQNStateDriver.
 
     :param actions_file_path: Path to the XML file.
     :param strategy: Strategy used to select routes.
     :param budget: Budget for the traveller.
-    :return: A list of drivers of type StateDriver.
+    :return: A list of drivers of type DQNStateDriver.
     """
     drivers = []
 
@@ -536,7 +536,7 @@ def initialise_drivers_state(
                 routes.append((i, route.get("edges", "").split()))
                 costs.append(float(route.get("cost", "0")))
         drivers.append(
-            StateDriver(
+            DQNStateDriver(
                 budget=budget,
                 trip_id=vehicle.get("id"),
                 routes=routes,
