@@ -52,6 +52,7 @@ def main(config, total_budget: int) -> None:
                 total_budget=total_budget,
                 epsilon=hyperparams["epsilon"],
                 compliance_rate=config["compliance_rate"],
+                upper_confidence_bound=config["upper_confidence_bound"],
             )
         # Take action from policy for every driver without incentives mode
         else:

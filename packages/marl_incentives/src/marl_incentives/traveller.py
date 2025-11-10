@@ -39,18 +39,23 @@ class Driver:
         self.routes = routes
         self.costs = costs
         self.strategy = strategy
+        self.action_counts = np.zeros(len(self.costs))
 
         # Initialise the Q-table
         if incentives_mode and state_variable:
             self.q_values = np.zeros((10, len(self.costs) + 1))
             self.state = 0
+            self.action_counts = np.zeros(len(self.costs) + 1)
         elif incentives_mode and not state_variable:
             self.q_values = np.zeros((len(self.costs) + 1))
+            self.action_counts = np.zeros(len(self.costs) + 1)
         elif not incentives_mode and state_variable:
             self.q_values = np.zeros((10, len(self.costs)))
             self.state = 0
+            self.action_counts = np.zeros(len(self.costs))
         else:
             self.q_values = np.zeros(len(self.costs))
+            self.action_counts = np.zeros(len(self.costs))
 
     def eps_greedy_policy_no_incentives(self, epsilon: float) -> tuple[list, int]:
         """
@@ -89,6 +94,37 @@ class Driver:
         # Perform action with maximum Q-value with probability 1 - epsilon
         else:
             action_index = np.argmin(self.q_values)
+
+        adjusted_costs = self.costs.copy()
+        # Compute incentive to apply
+        if action_index < num_routes:
+            incentive = self.costs[action_index] - min(self.costs) + 1
+            # Apply incentive to cost
+            adjusted_costs[action_index] -= incentive
+        else:
+            incentive = 0
+
+        # Choose the route with the minimum adjusted cost
+        # Here, the route selection strategy should always be minimum cost
+        # as we assume that travellers take the incentivised route deterministically
+        # when participation rate is added, this will need modification
+        selected_action = self.route_selection_strategy(
+            strategy="argmin", costs=adjusted_costs
+        )
+        route_edges = self.routes[selected_action][1]
+
+        return route_edges, selected_action, action_index, incentive
+
+    def upper_confidence_bound(self, c: float = 0.1) -> tuple[list, int, int, float]:
+        """pass."""
+        num_routes = len(self.costs)
+
+        # Can edit it to be the current episode number instead
+        t = np.sum(self.action_counts) + 1
+        ucb = self.q_values + c * np.sqrt((2 * np.log(t)) / (self.action_counts + 1e-9))
+
+        # Perform action with maximum Q-value + UCB
+        action_index = int(np.argmin(ucb))
 
         adjusted_costs = self.costs.copy()
         # Compute incentive to apply
@@ -308,6 +344,7 @@ def policy_incentives(
     total_budget: float,
     epsilon: float,
     compliance_rate: bool = False,
+    upper_confidence_bound: bool = False,
 ) -> tuple[dict[str, list], dict[str, tuple]]:
     """
     Apply an epsilon-greedy policy for route and incentive selection.
@@ -316,18 +353,22 @@ def policy_incentives(
     :param total_budget: Maximum total incentive budget.
     :param epsilon: Probability of selecting a random action.
     :param compliance_rate: Whether to simulate compliance rate randomness.
+    :param upper_confidence_bound: Whether to use UCB for action selection.
     :return:
         route_edges: mapping trip_id → selected route edges
         actions_index: mapping trip_id → (route_idx, incentive_level)
     """
-
     route_edges = {}
     actions_index = {}
     current_used_budget = 0.0
 
     for driver in drivers:
-        # --- Step 1: Base action via epsilon-greedy ---
-        edges, _, index, incentive = driver.eps_greedy_policy_incentives(epsilon)
+        # --- Step 1: Base action via epsilon-greedy or UCB ---
+        edges, _, index, incentive = (
+            driver.eps_greedy_policy_incentives(epsilon)
+            if not upper_confidence_bound
+            else driver.upper_confidence_bound()
+        )
 
         # --- Step 2: Apply compliance rate randomness ---
         # Only applies for when incentives are assigned

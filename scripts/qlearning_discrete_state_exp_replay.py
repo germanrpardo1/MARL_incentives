@@ -106,12 +106,17 @@ def main(config, total_budget: int) -> None:
         "compliance_rate_exp_replay" if config["compliance_rate"] else "exp_replay"
     )
     ut.save_metric(
-        ttts, labels_dict, base_name + "_ttt", "TTT [h]", total_budget, weights
+        ttts,
+        labels_dict,
+        base_name + "discrete_state" + "_ttt",
+        "TTT [h]",
+        total_budget,
+        weights,
     )
     ut.save_metric(
         emissions_total,
         labels_dict,
-        base_name + "_emissions",
+        base_name + "discrete_state" + "_emissions",
         "Emissions [kg]",
         total_budget,
         weights,

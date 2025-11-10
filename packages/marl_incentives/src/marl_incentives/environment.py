@@ -40,7 +40,9 @@ class Network:
                 capacity=buffer_capacity, batch_size=batch_size
             )
         else:
-            self.buffer = rb.StateReplayBuffer(capacity=buffer_capacity)
+            self.buffer = rb.StateReplayBuffer(
+                capacity=buffer_capacity, batch_size=batch_size
+            )
 
     def run_simulation(self) -> None:
         """Run a SUMO simulation."""
