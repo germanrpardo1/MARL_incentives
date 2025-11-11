@@ -48,11 +48,10 @@ def main(config, total_budget: int) -> None:
         # Get action from policy for every driver with incentives mode
         if config["incentives_mode"]:
             routes_edges, actions_index = tr.policy_incentives(
-                drivers,
+                drivers=drivers,
                 total_budget=total_budget,
                 epsilon=hyperparams["epsilon"],
                 compliance_rate=config["compliance_rate"],
-                upper_confidence_bound=config["upper_confidence_bound"],
             )
         # Take action from policy for every driver without incentives mode
         else:
@@ -93,9 +92,7 @@ def main(config, total_budget: int) -> None:
                 )
 
         # Log progress
-        ut.log_progress(
-            i=i, episodes=config["episodes"], hyperparams=hyperparams, ttts=ttts
-        )
+        ut.log_progress(i=i, episodes=config["episodes"], ttts=ttts)
 
         # Update travel times
         ut.update_average_travel_times(

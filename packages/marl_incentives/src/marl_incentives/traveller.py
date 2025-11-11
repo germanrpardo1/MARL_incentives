@@ -116,13 +116,13 @@ class Driver:
 
         return route_edges, selected_action, action_index, incentive
 
-    def upper_confidence_bound(self, c: float = 1) -> tuple[list, int, int, float]:
+    def upper_confidence_bound(self, c: float = 200) -> tuple[list, int, int, float]:
         """pass."""
         num_routes = len(self.costs)
 
         # Calculate upper confidence bound
-        ucb = self.q_values + np.sqrt(
-            (c * np.log(self.t)) / (self.action_counts + 1e-9)
+        ucb = self.q_values + c * np.sqrt(
+            (np.log(self.t)) / (self.action_counts + 1e-9)
         )
 
         # Perform action with maximum Q-value + UCB
@@ -393,6 +393,10 @@ def policy_incentives(
         current_used_budget += incentive
         route_edges[driver.trip_id] = edges
         actions_index[driver.trip_id] = index
+
+        if upper_confidence_bound:
+            driver.action_counts[index] += 1
+            driver.t += 1
 
     return route_edges, actions_index
 

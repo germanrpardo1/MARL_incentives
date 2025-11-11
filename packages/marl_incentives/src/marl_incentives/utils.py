@@ -276,7 +276,6 @@ def plot_weight_sensitivity(
 def log_progress(
     i: int,
     episodes: int,
-    hyperparams: dict,
     ttts: list,
     interval: int = 50,
     window: int = 50,
@@ -287,7 +286,6 @@ def log_progress(
 
     :param i: Current episode index.
     :param episodes: Total number of episodes.
-    :param hyperparams: Dictionary containing training hyperparameters.
     :param ttts: List of time-to-target (or similar metric).
     :param interval: How often to print detailed info.
     :param window: Number of entries to average for first/last comparison.
@@ -309,7 +307,6 @@ def log_progress(
         )
 
         sys.stdout.write(
-            f"\nEpsilon: {hyperparams['epsilon']:.4f} | "
             f"TTT first {window}: {first_mean:.2f} | "
             f"TTT last {window}: {last_mean:.2f}\n"
         )

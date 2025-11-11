@@ -49,8 +49,6 @@ class ReplayBuffer:
             reward = driver.compute_reward(ind_tt, ind_em, total_tt, total_em, weights)
             # Update Q-value
             driver.q_values[idx] = (1 - alpha) * driver.q_values[idx] + alpha * reward
-            driver.action_counts[idx] += 1
-            driver.t += 1
 
     def __len__(self) -> int:
         """Get the size of the replay buffer."""

@@ -4,9 +4,6 @@ episodes: 750
 # True if using compliance rate, false otherwise
 compliance_rate: true
 
-# True if using Upper Confidence Bound for action selection
-upper_confidence_bound: true
-
 ### Weights for different components of the reward/cost function
 # Weight for Total Travel Time (TTT) of the network
 TTT_weight: 0

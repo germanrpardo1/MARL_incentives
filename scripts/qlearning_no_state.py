@@ -66,6 +66,8 @@ def main(config, total_budget: int) -> None:
                 drivers=drivers,
                 total_budget=total_budget,
                 epsilon=hyperparams["epsilon"],
+                compliance_rate=config["compliance_rate"],
+                upper_confidence_bound=config["upper_confidence_bound"],
             )
         # Take action from policy for every driver without incentives mode
         else:
@@ -88,21 +90,24 @@ def main(config, total_budget: int) -> None:
 
             # Compute reward
             reward = driver.compute_reward(ind_tt, ind_em, total_tt, total_em, weights)
-
-            # Update Q-value: Q(a) = (1 - alpha) * Q(a) + alpha * r
-            driver.q_values[idx] = (1 - hyperparams["alpha"]) * driver.q_values[
-                idx
-            ] + hyperparams["alpha"] * reward
+            if not config["upper_confidence_bound"]:
+                # Update Q-value: Q(a) = (1 - alpha) * Q(a) + alpha * r
+                driver.q_values[idx] = (1 - hyperparams["alpha"]) * driver.q_values[
+                    idx
+                ] + hyperparams["alpha"] * reward
+            else:
+                driver.q_values[idx] = (
+                    (driver.action_counts[idx] - 1) / driver.action_counts[idx]
+                ) * driver.q_values[idx] + (1 / driver.action_counts[idx]) * reward
 
         # Log progress
-        ut.log_progress(
-            i=i, episodes=config["episodes"], hyperparams=hyperparams, ttts=ttts
-        )
+        ut.log_progress(i=i, episodes=config["episodes"], ttts=ttts)
 
-        # Reduce epsilon
-        hyperparams["epsilon"] = max(
-            0.01, hyperparams["epsilon"] * hyperparams["decay"]
-        )
+        if not config["upper_confidence_bound"]:
+            # Reduce epsilon
+            hyperparams["epsilon"] = max(
+                0.01, hyperparams["epsilon"] * hyperparams["decay"]
+            )
 
         # Update travel times
         ut.update_average_travel_times(
