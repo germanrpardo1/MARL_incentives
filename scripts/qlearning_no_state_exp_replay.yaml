@@ -18,8 +18,8 @@ emissions_weight: 0
 total_emissions_weight: 0
 
 # Buffer capacity for experience replay
-buffer_capacity: 100
-batch_size: 32
+buffer_capacity: 200
+batch_size: 64
 
 # Exploration rate for epsilon-greedy policy
 epsilon: 0.9

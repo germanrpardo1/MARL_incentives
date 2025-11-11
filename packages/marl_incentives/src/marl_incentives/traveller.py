@@ -40,6 +40,7 @@ class Driver:
         self.costs = costs
         self.strategy = strategy
         self.action_counts = np.zeros(len(self.costs))
+        self.t = 0
 
         # Initialise the Q-table
         if incentives_mode and state_variable:
@@ -115,13 +116,14 @@ class Driver:
 
         return route_edges, selected_action, action_index, incentive
 
-    def upper_confidence_bound(self, c: float = 0.1) -> tuple[list, int, int, float]:
+    def upper_confidence_bound(self, c: float = 1) -> tuple[list, int, int, float]:
         """pass."""
         num_routes = len(self.costs)
 
-        # Can edit it to be the current episode number instead
-        t = np.sum(self.action_counts) + 1
-        ucb = self.q_values + c * np.sqrt((2 * np.log(t)) / (self.action_counts + 1e-9))
+        # Calculate upper confidence bound
+        ucb = self.q_values + np.sqrt(
+            (c * np.log(self.t)) / (self.action_counts + 1e-9)
+        )
 
         # Perform action with maximum Q-value + UCB
         action_index = int(np.argmin(ucb))
