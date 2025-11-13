@@ -11,9 +11,9 @@ upper_confidence_bound: true
 # Weight for Total Travel Time (TTT) of the network
 TTT_weight: 0
 # Weight for individual travel time of each agent
-individual_travel_time_weight: 0.75
+individual_travel_time_weight: 1
 # Weight for minimising individual emissions
-emissions_weight: 0.25
+emissions_weight: 0
 # Total emissions weight
 total_emissions_weight: 0
 

@@ -121,11 +121,9 @@ class Driver:
         num_routes = len(self.costs)
 
         # Calculate upper confidence bound
-        ucb = self.q_values + c * np.sqrt(
-            (np.log(self.t)) / (self.action_counts + 1e-9)
-        )
+        ucb = self.q_values + c * np.sqrt(np.log(self.t) / (self.action_counts + 1e-9))
 
-        # Perform action with maximum Q-value + UCB
+        # Perform action with minimum Q-value + UCB
         action_index = int(np.argmin(ucb))
 
         adjusted_costs = self.costs.copy()
@@ -347,7 +345,7 @@ def policy_incentives(
     epsilon: float,
     compliance_rate: bool = False,
     upper_confidence_bound: bool = False,
-) -> tuple[dict[str, list], dict[str, tuple]]:
+) -> tuple[dict[str, list], dict[str, tuple], float]:
     """
     Apply an epsilon-greedy policy for route and incentive selection.
 
@@ -359,12 +357,15 @@ def policy_incentives(
     :return:
         route_edges: mapping trip_id → selected route edges
         actions_index: mapping trip_id → (route_idx, incentive_level)
+        current_used_budget: Budget effectively used
     """
     route_edges = {}
     actions_index = {}
     current_used_budget = 0.0
+    total_accepted_paths = 0
 
     for driver in drivers:
+        path_accepted = True
         # --- Step 1: Base action via epsilon-greedy or UCB ---
         edges, _, index, incentive = (
             driver.eps_greedy_policy_incentives(epsilon)
@@ -384,10 +385,12 @@ def policy_incentives(
             if _rng.random() >= prob:
                 # Route not accepted, select shortest path
                 _, edges, incentive = select_default_route(driver)
+                path_accepted = False
 
         # --- Step 3: Enforce budget limit ---
         if current_used_budget + incentive > total_budget:
             _, edges, incentive = select_default_route(driver)
+            path_accepted = False
 
         # --- Step 4: Update trackers ---
         current_used_budget += incentive
@@ -396,9 +399,10 @@ def policy_incentives(
 
         if upper_confidence_bound:
             driver.action_counts[index] += 1
-            driver.t += 1
 
-    return route_edges, actions_index
+        if path_accepted and incentive > 0:
+            total_accepted_paths += 1
+    return route_edges, actions_index, current_used_budget
 
 
 def policy_incentives_discrete_state(

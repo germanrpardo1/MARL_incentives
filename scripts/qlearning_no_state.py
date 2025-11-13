@@ -62,7 +62,7 @@ def main(config, total_budget: int) -> None:
     for i in range(config["episodes"]):
         # Take action from policy for every driver with incentives mode
         if config["incentives_mode"]:
-            routes_edges, actions_index = tr.policy_incentives(
+            routes_edges, actions_index, current_used_budget = tr.policy_incentives(
                 drivers=drivers,
                 total_budget=total_budget,
                 epsilon=hyperparams["epsilon"],
@@ -96,9 +96,12 @@ def main(config, total_budget: int) -> None:
                     idx
                 ] + hyperparams["alpha"] * reward
             else:
+                # Update Q-value: Q(a) = ((N(a) - 1) / N(a)) * Q(a) + (1/N(a)) * r
                 driver.q_values[idx] = (
                     (driver.action_counts[idx] - 1) / driver.action_counts[idx]
                 ) * driver.q_values[idx] + (1 / driver.action_counts[idx]) * reward
+
+            driver.t += 1
 
         # Log progress
         ut.log_progress(i=i, episodes=config["episodes"], ttts=ttts)
