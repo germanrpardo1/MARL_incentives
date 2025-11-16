@@ -32,6 +32,8 @@ def main(config, total_budget: int) -> None:
 
     ttts = []
     emissions_total = []
+    current_used_budgets = []
+    tot_accepted_paths = []
     labels_dict = {}
 
     # Instantiate network object
@@ -47,12 +49,16 @@ def main(config, total_budget: int) -> None:
     for i in range(config["episodes"]):
         # Get action from policy for every driver with incentives mode
         if config["incentives_mode"]:
-            routes_edges, actions_index, current_used_budget = tr.policy_incentives(
-                drivers=drivers,
-                total_budget=total_budget,
-                epsilon=hyperparams["epsilon"],
-                compliance_rate=config["compliance_rate"],
+            routes_edges, actions_index, current_used_budget, tot_accepted_path = (
+                tr.policy_incentives(
+                    drivers=drivers,
+                    total_budget=total_budget,
+                    epsilon=hyperparams["epsilon"],
+                    compliance_rate=config["compliance_rate"],
+                )
             )
+            tot_accepted_paths.append(tot_accepted_path)
+            current_used_budgets.append(current_used_budget)
         # Take action from policy for every driver without incentives mode
         else:
             routes_edges, actions_index = tr.policy_no_incentives(
@@ -111,6 +117,22 @@ def main(config, total_budget: int) -> None:
         labels_dict,
         base_name + "_emissions",
         "Emissions [kg]",
+        total_budget,
+        weights,
+    )
+    ut.save_metric(
+        current_used_budgets,
+        labels_dict,
+        base_name + "_used_budget",
+        "Budget",
+        total_budget,
+        weights,
+    )
+    ut.save_metric(
+        tot_accepted_paths,
+        labels_dict,
+        base_name + "_accepted_paths",
+        "Number of accepted paths",
         total_budget,
         weights,
     )

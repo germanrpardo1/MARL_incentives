@@ -62,12 +62,14 @@ def main(config, total_budget: int) -> None:
     for i in range(config["episodes"]):
         # Take action from policy for every driver with incentives mode
         if config["incentives_mode"]:
-            routes_edges, actions_index, current_used_budget = tr.policy_incentives(
-                drivers=drivers,
-                total_budget=total_budget,
-                epsilon=hyperparams["epsilon"],
-                compliance_rate=config["compliance_rate"],
-                upper_confidence_bound=config["upper_confidence_bound"],
+            routes_edges, actions_index, current_used_budget, tot_accepted_paths = (
+                tr.policy_incentives(
+                    drivers=drivers,
+                    total_budget=total_budget,
+                    epsilon=hyperparams["epsilon"],
+                    compliance_rate=config["compliance_rate"],
+                    upper_confidence_bound=config["upper_confidence_bound"],
+                )
             )
         # Take action from policy for every driver without incentives mode
         else:

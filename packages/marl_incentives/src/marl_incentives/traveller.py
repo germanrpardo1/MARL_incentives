@@ -345,7 +345,7 @@ def policy_incentives(
     epsilon: float,
     compliance_rate: bool = False,
     upper_confidence_bound: bool = False,
-) -> tuple[dict[str, list], dict[str, tuple], float]:
+) -> tuple[dict[str, list], dict[str, tuple], float, int]:
     """
     Apply an epsilon-greedy policy for route and incentive selection.
 
@@ -402,7 +402,8 @@ def policy_incentives(
 
         if path_accepted and incentive > 0:
             total_accepted_paths += 1
-    return route_edges, actions_index, current_used_budget
+
+    return route_edges, actions_index, current_used_budget, total_accepted_paths
 
 
 def policy_incentives_discrete_state(

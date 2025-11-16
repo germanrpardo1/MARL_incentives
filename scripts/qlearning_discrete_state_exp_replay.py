@@ -92,9 +92,7 @@ def main(config, total_budget: int) -> None:
                 )
 
         # Log progress
-        ut.log_progress(
-            i=i, episodes=config["episodes"], hyperparams=hyperparams, ttts=ttts
-        )
+        ut.log_progress(i=i, episodes=config["episodes"], ttts=ttts)
 
         # Update travel times
         ut.update_average_travel_times(
