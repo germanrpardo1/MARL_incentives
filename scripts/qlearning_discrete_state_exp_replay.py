@@ -106,7 +106,7 @@ def main(config, total_budget: int) -> None:
     ut.save_metric(
         ttts,
         labels_dict,
-        base_name + "discrete_state" + "_ttt",
+        base_name + "_discrete_state" + "_ttt",
         "TTT [h]",
         total_budget,
         weights,
@@ -114,7 +114,7 @@ def main(config, total_budget: int) -> None:
     ut.save_metric(
         emissions_total,
         labels_dict,
-        base_name + "discrete_state" + "_emissions",
+        base_name + "_discrete_state" + "_emissions",
         "Emissions [kg]",
         total_budget,
         weights,
