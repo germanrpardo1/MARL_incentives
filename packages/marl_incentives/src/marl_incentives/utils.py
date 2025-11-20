@@ -107,7 +107,7 @@ def plot_multiple_curves(
     budgets: list[int],
     weights: dict,
     base_name: str,
-    baseline_path: str,
+    baseline_path: str | None,
     window_size: int = 30,
     ext: str = "pdf",
 ) -> None:

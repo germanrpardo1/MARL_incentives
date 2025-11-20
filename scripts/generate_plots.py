@@ -45,6 +45,26 @@ def plot_multiple_budgets(config_file: dict) -> None:
             window_size=window_size,
             ext=files_extension,
         )
+        ut.plot_multiple_curves(
+            title=title,
+            y_label=labels["accepted_paths"],
+            budgets=budgets,
+            base_name="compliance_rate_exp_replay_accepted_paths",
+            weights=weights,
+            baseline_path="None",
+            window_size=window_size,
+            ext=files_extension,
+        )
+        ut.plot_multiple_curves(
+            title=title,
+            y_label=labels["used_budget"],
+            budgets=budgets,
+            base_name="compliance_rate_exp_replay_used_budget",
+            weights=weights,
+            baseline_path="None",
+            window_size=window_size,
+            ext=files_extension,
+        )
 
     # Plot single-objective and multi-objective cases
     plot_curve_set(titles["time"], weights_list[0])  # Travel time only
