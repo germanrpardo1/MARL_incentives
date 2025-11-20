@@ -52,6 +52,7 @@ class Network:
         log_file.flush()
         sys.__stdout__.flush()
 
+        # sumo_cmd = ["sumo-gui", "-c", self.sumo_params["config_path"]]
         sumo_cmd = ["sumo", "-c", self.sumo_params["config_path"]]
         sumo_cmd = list(map(str, sumo_cmd))
         subprocess.call(sumo_cmd, stdout=log_file, stderr=log_file)

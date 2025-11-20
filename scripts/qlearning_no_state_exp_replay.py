@@ -5,10 +5,35 @@ It uses experience replay to accelerate learning, and it does not have
 a state variable.
 """
 
-from marl_incentives import environment as env
 from marl_incentives import traveller as tr
 from marl_incentives import utils as ut
 from marl_incentives import xml_manipulation as xml
+from marl_incentives.environment import Network
+from marl_incentives.traveller import Driver
+
+
+def experience_replay(
+    network_env: Network, drivers: list[Driver], weights, hyperparams
+) -> float:
+    """pass."""
+    epsilon = hyperparams["epsilon"]
+    decay = hyperparams["decay"]
+    # Sample past observations from replay buffer
+    acts, rewards = network_env.buffer.sample(network_env.buffer.batch_size)
+    for a, r in zip(acts, rewards):
+        # For each agent update Q function
+        # Q(a) = (1 - alpha) * Q(a) + alpha * r
+        network_env.buffer.update_q_values(
+            drivers=drivers,
+            action_index=a,
+            reward=r,
+            weights=weights,
+            alpha=hyperparams["alpha"],
+        )
+
+        # Reduce epsilon
+        epsilon = max(0.01, epsilon * decay)
+    return epsilon
 
 
 def main(config, total_budget: int) -> None:
@@ -37,7 +62,7 @@ def main(config, total_budget: int) -> None:
     labels_dict = {}
 
     # Instantiate network object
-    network_env = env.Network(
+    network_env = Network(
         paths_dict=paths_dict,
         sumo_params=sumo_params,
         edge_data_frequency=edge_data_frequency,
@@ -79,23 +104,9 @@ def main(config, total_budget: int) -> None:
 
         # If there are enough observations in the buffer, sample and update Qs
         if len(network_env.buffer) >= network_env.buffer.batch_size:
-            # Sample past observations from replay buffer
-            acts, rewards = network_env.buffer.sample(network_env.buffer.batch_size)
-            for a, r in zip(acts, rewards):
-                # For each agent update Q function
-                # Q(a) = (1 - alpha) * Q(a) + alpha * r
-                network_env.buffer.update_q_values(
-                    drivers=drivers,
-                    action_index=a,
-                    reward=r,
-                    weights=weights,
-                    alpha=hyperparams["alpha"],
-                )
-
-                # Reduce epsilon
-                hyperparams["epsilon"] = max(
-                    0.01, hyperparams["epsilon"] * hyperparams["decay"]
-                )
+            hyperparams["epsilon"] = experience_replay(
+                network_env, drivers, weights, hyperparams
+            )
 
         # Log progress
         ut.log_progress(i=i, episodes=config["episodes"], ttts=ttts)
