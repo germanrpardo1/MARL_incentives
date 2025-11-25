@@ -42,16 +42,19 @@ class Driver:
         self.action_counts = np.zeros(len(self.costs))
         self.t = 0
 
+        self.estimated_means = np.append(np.array(costs), min(costs))
+        self.estimated_stds = np.ones(len(self.costs) + 1)
+
         # Initialise the Q-table
         if incentives_mode and state_variable:
-            self.q_values = np.zeros((10, len(self.costs) + 1))
+            self.q_values = np.zeros((2, len(self.costs) + 1))
             self.state = 0
             self.action_counts = np.zeros(len(self.costs) + 1)
         elif incentives_mode and not state_variable:
             self.q_values = np.zeros((len(self.costs) + 1))
             self.action_counts = np.zeros(len(self.costs) + 1)
         elif not incentives_mode and state_variable:
-            self.q_values = np.zeros((10, len(self.costs)))
+            self.q_values = np.zeros((2, len(self.costs)))
             self.state = 0
             self.action_counts = np.zeros(len(self.costs))
         else:
@@ -118,6 +121,8 @@ class Driver:
 
     def upper_confidence_bound(self, c: float = 200) -> tuple[list, int, int, float]:
         """pass."""
+        # upper_confidence_bounds = [q_values[action] + c * np.sqrt(np.log(iteration + 1) / (num_invocations[action])) if num_invocations[action] > 0 else np.inf for action in actions]
+        # return np.random.choice([action_ for action_, value_ in enumerate(upper_confidence_bounds) if value_ == np.max(upper_confidence_bounds)])
         num_routes = len(self.costs)
 
         # Calculate upper confidence bound
@@ -125,6 +130,35 @@ class Driver:
 
         # Perform action with minimum Q-value + UCB
         action_index = int(np.argmin(ucb))
+
+        adjusted_costs = self.costs.copy()
+        # Compute incentive to apply
+        if action_index < num_routes:
+            incentive = self.costs[action_index] - min(self.costs) + 1
+            # Apply incentive to cost
+            adjusted_costs[action_index] -= incentive
+        else:
+            incentive = 0
+
+        # Choose the route with the minimum adjusted cost
+        # Here, the route selection strategy should always be minimum cost
+        # as we assume that travellers take the incentivised route deterministically
+        # when participation rate is added, this will need modification
+        selected_action = self.route_selection_strategy(
+            strategy="argmin", costs=adjusted_costs
+        )
+        route_edges = self.routes[selected_action][1]
+
+        return route_edges, selected_action, action_index, incentive
+
+    def thompson_sampling(self) -> tuple[list, int, int, float]:
+        """pass."""
+
+        samples_travel_times = np.random.normal(
+            loc=self.estimated_means, scale=self.estimated_stds
+        )
+        action_index = int(np.argmin(samples_travel_times))
+        num_routes = len(self.costs)
 
         adjusted_costs = self.costs.copy()
         # Compute incentive to apply
@@ -342,9 +376,10 @@ def select_default_route(driver: Driver):
 def policy_incentives(
     drivers: list[Driver],
     total_budget: float,
-    epsilon: float,
+    epsilon: float | None = None,
     compliance_rate: bool = False,
     upper_confidence_bound: bool = False,
+    thompson_sampling: bool = False,
 ) -> tuple[dict[str, list], dict[str, tuple], float, int]:
     """
     Apply an epsilon-greedy policy for route and incentive selection.
@@ -367,11 +402,12 @@ def policy_incentives(
     for driver in drivers:
         path_accepted = True
         # --- Step 1: Base action via epsilon-greedy or UCB ---
-        edges, _, index, incentive = (
-            driver.eps_greedy_policy_incentives(epsilon)
-            if not upper_confidence_bound
-            else driver.upper_confidence_bound()
-        )
+        if upper_confidence_bound:
+            edges, _, index, incentive = driver.upper_confidence_bound()
+        elif thompson_sampling:
+            edges, _, index, incentive = driver.thompson_sampling()
+        else:
+            edges, _, index, incentive = driver.eps_greedy_policy_incentives(epsilon)
 
         # --- Step 2: Apply compliance rate randomness ---
         # Only applies for when incentives are assigned
@@ -397,7 +433,7 @@ def policy_incentives(
         route_edges[driver.trip_id] = edges
         actions_index[driver.trip_id] = index
 
-        if upper_confidence_bound:
+        if upper_confidence_bound or thompson_sampling:
             driver.action_counts[index] += 1
 
         if path_accepted and incentive > 0:
@@ -429,9 +465,17 @@ def policy_incentives_discrete_state(
     current_used_budget = 0.0
 
     for driver in drivers:
+        remaining = total_budget - current_used_budget
+        ratio_left = remaining / total_budget
+
+        if ratio_left <= 0.20:
+            driver.state = 0
+        else:
+            driver.state = 1
+
         state = total_budget - current_used_budget
-        n = int(np.floor((state / total_budget) * 10) - 1)
-        driver.state = n
+        n = int(np.floor((state / total_budget) * 2) - 1)
+        # driver.state = n
         # --- Step 1: Base action via epsilon-greedy ---
         edges, _, index, incentive = driver.eps_greedy_policy_incentives_discrete_state(
             epsilon, n
