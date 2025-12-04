@@ -24,6 +24,7 @@ class Driver:
         incentives_mode: bool,
         state_variable: bool = False,
         strategy: str = "argmin",
+        thompson_sampling_method: bool | None = None,
     ) -> None:
         """
         Constructor method for a single driver.
@@ -34,6 +35,7 @@ class Driver:
         :param incentives_mode: True if the driver should include incentives, False otherwise.
         :param state_variable: True if using state variable, False otherwise.
         :param strategy: The strategy to assign routes.
+        :param thompson_sampling_method: True if using Thompson sampling, False otherwise.
         """
         self.trip_id = trip_id
         self.routes = routes
@@ -45,21 +47,26 @@ class Driver:
         self.estimated_means = np.append(np.array(costs), min(costs))
         self.estimated_stds = np.ones(len(self.costs) + 1)
 
-        # Initialise the Q-table
-        if incentives_mode and state_variable:
-            self.q_values = np.zeros((2, len(self.costs) + 1))
-            self.state = 0
-            self.action_counts = np.zeros(len(self.costs) + 1)
-        elif incentives_mode and not state_variable:
-            self.q_values = np.zeros((len(self.costs) + 1))
-            self.action_counts = np.zeros(len(self.costs) + 1)
-        elif not incentives_mode and state_variable:
-            self.q_values = np.zeros((2, len(self.costs)))
-            self.state = 0
-            self.action_counts = np.zeros(len(self.costs))
+        if not thompson_sampling_method:
+            # Initialise the Q-table
+            if incentives_mode and state_variable:
+                self.q_values = np.zeros((2, len(self.costs) + 1))
+                self.state = 0
+                self.action_counts = np.zeros(len(self.costs) + 1)
+            elif incentives_mode and not state_variable:
+                self.q_values = np.zeros((len(self.costs) + 1))
+                self.action_counts = np.zeros(len(self.costs) + 1)
+            elif not incentives_mode and state_variable:
+                self.q_values = np.zeros((2, len(self.costs)))
+                self.state = 0
+                self.action_counts = np.zeros(len(self.costs))
+            else:
+                self.q_values = np.zeros(len(self.costs))
+                self.action_counts = np.zeros(len(self.costs))
         else:
-            self.q_values = np.zeros(len(self.costs))
-            self.action_counts = np.zeros(len(self.costs))
+            self.means = costs
+            self.stds = np.ones(len(self.costs))
+            self.reward_stds = np.ones(len(self.costs))
 
     def eps_greedy_policy_no_incentives(self, epsilon: float) -> tuple[list, int]:
         """
@@ -324,6 +331,7 @@ def initialise_drivers(
     incentives_mode: bool,
     strategy: str,
     state_variable: bool = False,
+    thompson_sampling_method: bool | None = None,
 ) -> list[Driver]:
     """
     Initialise all the drivers of type DQNStateDriver.
@@ -332,6 +340,7 @@ def initialise_drivers(
     :param incentives_mode: Whether the incentives are applied.
     :param strategy: Strategy used to select routes.
     :param state_variable: True if using state variable, False otherwise.
+    :param thompson_sampling_method: True if using thompson sampling. False otherwise.
     :return: A list of drivers of type DQNStateDriver.
     """
     drivers = []
@@ -358,6 +367,7 @@ def initialise_drivers(
                     strategy=strategy,
                     incentives_mode=incentives_mode,
                     state_variable=state_variable,
+                    thompson_sampling_method=thompson_sampling_method,
                 )
             )
     return drivers

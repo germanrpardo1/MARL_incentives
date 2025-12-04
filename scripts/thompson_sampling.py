@@ -43,6 +43,7 @@ def main(config, total_budget: int) -> None:
         actions_file_path=paths_dict["output_rou_alt_path"],
         incentives_mode=config["incentives_mode"],
         strategy=config["strategy"],
+        thompson_sampling_method=True,
     )
 
     ttts = []
@@ -90,22 +91,6 @@ def main(config, total_budget: int) -> None:
 
             # Compute reward
             reward = driver.compute_reward(ind_tt, ind_em, total_tt, total_em, weights)
-            if not config["upper_confidence_bound"]:
-                # Update Q-value: Q(a) = (1 - alpha) * Q(a) + alpha * r
-                driver.q_values[idx] = (1 - hyperparams["alpha"]) * driver.q_values[
-                    idx
-                ] + hyperparams["alpha"] * reward
-            else:
-                # Update Q-value: Q(a) = ((N(a) - 1) / N(a)) * Q(a) + (1/N(a)) * r
-                driver.q_values[idx] = (
-                    (driver.action_counts[idx] - 1) / driver.action_counts[idx]
-                ) * driver.q_values[idx] + (1 / driver.action_counts[idx]) * reward
-
-            driver.estimated_means[idx] = driver.estimated_means[idx] + reward / (
-                driver.action_counts[idx] + 1
-            )
-
-            driver.t += 1
 
         # Log progress
         ut.log_progress(i=i, episodes=config["episodes"], ttts=ttts)
