@@ -60,21 +60,15 @@ def main(config, total_budget: int) -> None:
     # Start training loop for RL agents
     for i in range(config["episodes"]):
         # Take action from policy for every driver with incentives mode
-        if config["incentives_mode"]:
-            routes_edges, actions_index, current_used_budget, tot_accepted_paths = (
-                tr.policy_incentives(
-                    drivers=drivers,
-                    total_budget=total_budget,
-                    epsilon=hyperparams["epsilon"],
-                    compliance_rate=config["compliance_rate"],
-                    thompson_sampling=True,
-                )
+        routes_edges, actions_index, current_used_budget, tot_accepted_paths = (
+            tr.policy_incentives(
+                drivers=drivers,
+                total_budget=total_budget,
+                epsilon=hyperparams["epsilon"],
+                compliance_rate=config["compliance_rate"],
+                thompson_sampling=True,
             )
-        # Take action from policy for every driver without incentives mode
-        else:
-            routes_edges, actions_index = tr.policy_no_incentives(
-                drivers=drivers, epsilon=hyperparams["epsilon"]
-            )
+        )
 
         # Perform actions for each driver
         total_tt, ind_tt, ind_em, total_em = network_env.step(

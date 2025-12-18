@@ -390,7 +390,7 @@ def policy_incentives(
     compliance_rate: bool = False,
     upper_confidence_bound: bool = False,
     thompson_sampling: bool = False,
-) -> tuple[dict[str, list], dict[str, tuple], float, int]:
+) -> tuple[dict[str, list], dict[str, tuple], float, float]:
     """
     Apply an epsilon-greedy policy for route and incentive selection.
 
@@ -399,6 +399,7 @@ def policy_incentives(
     :param epsilon: Probability of selecting a random action.
     :param compliance_rate: Whether to simulate compliance rate randomness.
     :param upper_confidence_bound: Whether to use UCB for action selection.
+    :param thompson_sampling: Whether to do Thompson sampling for action selection.
     :return:
         route_edges: mapping trip_id → selected route edges
         actions_index: mapping trip_id → (route_idx, incentive_level)
@@ -408,6 +409,7 @@ def policy_incentives(
     actions_index = {}
     current_used_budget = 0.0
     total_accepted_paths = 0
+    total_incentivised_paths = 0
 
     for driver in drivers:
         path_accepted = True
@@ -446,10 +448,17 @@ def policy_incentives(
         if upper_confidence_bound or thompson_sampling:
             driver.action_counts[index] += 1
 
-        if path_accepted and incentive > 0:
-            total_accepted_paths += 1
+        if incentive > 0:
+            total_incentivised_paths += 1
+            if path_accepted:
+                total_accepted_paths += 1
 
-    return route_edges, actions_index, current_used_budget, total_accepted_paths
+    return (
+        route_edges,
+        actions_index,
+        current_used_budget,
+        total_accepted_paths / total_incentivised_paths,
+    )
 
 
 def policy_incentives_discrete_state(

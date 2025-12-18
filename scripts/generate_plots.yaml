@@ -33,7 +33,7 @@ labels:
   ttt: "Total Travel Time [h]"
   emissions: "CO2 Emissions [kg]"
   used_budget: "Used budget"
-  accepted_paths: "Number of accepted paths"
+  acceptance_rates: "Acceptance rates"
 
 # Titles for plots
 titles:

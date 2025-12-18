@@ -58,7 +58,7 @@ def main(config, total_budget: int) -> None:
     ttts = []
     emissions_total = []
     current_used_budgets = []
-    tot_accepted_paths = []
+    acceptance_rates = []
     labels_dict = {}
 
     # Instantiate network object
@@ -74,7 +74,7 @@ def main(config, total_budget: int) -> None:
     for i in range(config["episodes"]):
         # Get action from policy for every driver with incentives mode
         if config["incentives_mode"]:
-            routes_edges, actions_index, current_used_budget, tot_accepted_path = (
+            routes_edges, actions_index, current_used_budget, acceptance_rate = (
                 tr.policy_incentives(
                     drivers=drivers,
                     total_budget=total_budget,
@@ -82,7 +82,7 @@ def main(config, total_budget: int) -> None:
                     compliance_rate=config["compliance_rate"],
                 )
             )
-            tot_accepted_paths.append(tot_accepted_path)
+            acceptance_rates.append(acceptance_rate)
             current_used_budgets.append(current_used_budget)
         # Take action from policy for every driver without incentives mode
         else:
@@ -140,10 +140,10 @@ def main(config, total_budget: int) -> None:
         weights,
     )
     ut.save_metric(
-        tot_accepted_paths,
+        acceptance_rates,
         labels_dict,
-        base_name + "_accepted_paths",
-        "Number of accepted paths",
+        base_name + "_acceptance_rates",
+        "Acceptance rates",
         total_budget,
         weights,
     )
