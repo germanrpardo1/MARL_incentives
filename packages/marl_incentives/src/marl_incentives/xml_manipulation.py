@@ -46,6 +46,10 @@ def write_sumo_config(
     # Navigate up to the project root and into 'data'
     ### Fix
     data_path = script_dir.parent.parent.parent / "data" / "edge_data.add.xml"
+    config_path = script_dir.parent.parent.parent / config_path
+    network_path = script_dir.parent.parent.parent / network_path
+    routes_path = script_dir.parent.parent.parent / routes_path
+
     sumo_cmd = [
         "sumo",
         "-n",

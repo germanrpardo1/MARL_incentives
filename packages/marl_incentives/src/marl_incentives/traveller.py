@@ -5,9 +5,9 @@ import xml.etree.ElementTree as ET
 import numpy as np
 import torch
 import torch.optim as optim
-from dqn_neural_network import DQN
 
 from marl_incentives import utils as ut
+from marl_incentives.dqn_neural_network import DQN
 
 # Initialise a random generator instance
 _rng = np.random.default_rng()
@@ -412,6 +412,7 @@ def policy_incentives(
     total_incentivised_paths = 0
 
     for driver in drivers:
+        num_routes = len(driver.costs)
         path_accepted = True
         # --- Step 1: Base action via epsilon-greedy or UCB ---
         if upper_confidence_bound:
@@ -444,14 +445,13 @@ def policy_incentives(
         current_used_budget += incentive
         route_edges[driver.trip_id] = edges
         actions_index[driver.trip_id] = index
-
-        if upper_confidence_bound or thompson_sampling:
-            driver.action_counts[index] += 1
-
-        if incentive > 0:
+        if index < num_routes:
             total_incentivised_paths += 1
             if path_accepted:
                 total_accepted_paths += 1
+
+        if upper_confidence_bound or thompson_sampling:
+            driver.action_counts[index] += 1
 
     return (
         route_edges,
