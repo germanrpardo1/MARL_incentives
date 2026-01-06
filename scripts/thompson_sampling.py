@@ -81,10 +81,15 @@ def main(config, total_budget: int) -> None:
 
         # Update Q function for each agent
         for driver in drivers:
+            # Unpack actions index
             idx = actions_index[driver.trip_id]
-
             # Compute reward
             reward = driver.compute_reward(ind_tt, ind_em, total_tt, total_em, weights)
+
+            # Update mean estimate based on the reward
+            driver.estimated_means[idx] = driver.estimated_means[idx] + (
+                reward - driver.estimated_means[idx]
+            ) / (driver.action_counts[idx] + 1)
 
         # Log progress
         ut.log_progress(i=i, episodes=config["episodes"], ttts=ttts)

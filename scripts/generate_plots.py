@@ -47,9 +47,9 @@ def plot_multiple_budgets(config_file: dict) -> None:
         )
         ut.plot_multiple_curves(
             title=title,
-            y_label=labels["accepted_paths"],
+            y_label=labels["acceptance_rates"],
             budgets=budgets,
-            base_name="compliance_rate_exp_replay_accepted_paths",
+            base_name="compliance_rate_exp_replay_acceptance_rates",
             weights=weights,
             baseline_path="None",
             window_size=window_size,
