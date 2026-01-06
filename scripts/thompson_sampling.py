@@ -48,6 +48,8 @@ def main(config, total_budget: int) -> None:
 
     ttts = []
     emissions_total = []
+    current_used_budgets = []
+    acceptance_rates = []
     labels_dict = {}
 
     # Instantiate network object
@@ -60,7 +62,7 @@ def main(config, total_budget: int) -> None:
     # Start training loop for RL agents
     for i in range(config["episodes"]):
         # Take action from policy for every driver with incentives mode
-        routes_edges, actions_index, current_used_budget, tot_accepted_paths = (
+        routes_edges, actions_index, current_used_budget, acceptance_rate = (
             tr.policy_incentives(
                 drivers=drivers,
                 total_budget=total_budget,
@@ -69,6 +71,8 @@ def main(config, total_budget: int) -> None:
                 thompson_sampling=True,
             )
         )
+        acceptance_rates.append(acceptance_rate)
+        current_used_budgets.append(current_used_budget)
 
         # Perform actions for each driver
         total_tt, ind_tt, ind_em, total_em = network_env.step(
@@ -106,12 +110,33 @@ def main(config, total_budget: int) -> None:
         )
 
     # Save the plot and pickle file for TTT and emissions
-    ut.save_metric(ttts, labels_dict, "ttt", "TTT [h]", total_budget, weights)
+    base_name = (
+        "compliance_rate_exp_replay" if config["compliance_rate"] else "exp_replay"
+    )
+    ut.save_metric(
+        ttts, labels_dict, base_name + "_ttt", "TTT [h]", total_budget, weights
+    )
     ut.save_metric(
         emissions_total,
         labels_dict,
-        "emissions",
+        base_name + "_emissions",
         "Emissions [kg]",
+        total_budget,
+        weights,
+    )
+    ut.save_metric(
+        current_used_budgets,
+        labels_dict,
+        base_name + "_used_budget",
+        "Budget",
+        total_budget,
+        weights,
+    )
+    ut.save_metric(
+        acceptance_rates,
+        labels_dict,
+        base_name + "_acceptance_rates",
+        "Acceptance rates",
         total_budget,
         weights,
     )
@@ -119,7 +144,7 @@ def main(config, total_budget: int) -> None:
 
 if __name__ == "__main__":
     # Load config
-    config_file = ut.load_config(path="scripts/qlearning_no_state.yaml")
+    config_file = ut.load_config(path="scripts/thompson_sampling.yaml")
 
     # Loop for different budgets
     for tot_budget in config_file["total_budget"]:

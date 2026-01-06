@@ -45,7 +45,7 @@ class Driver:
         self.t = 0
 
         self.estimated_means = np.append(np.array(costs), min(costs))
-        self.estimated_stds = np.full(len(self.costs) + 1, 100)
+        self.estimated_stds = np.full(len(self.costs) + 1, 20)
 
         if not thompson_sampling_method:
             # Initialise the Q-table
@@ -432,7 +432,7 @@ def policy_incentives(
             x = [(driver.costs[index] - min(driver.costs)) / 60]  # In minutes
             # Probability of accepting incentivised path
             prob = ut.logistic_prob(x, coefficients)
-            prob = 0.8
+            prob = 1
             if _rng.random() >= prob:
                 # Route not accepted, select shortest path
                 _, edges, incentive = select_default_route(driver)
