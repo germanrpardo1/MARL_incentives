@@ -3,6 +3,7 @@ This script runs the multi-agent Reinforcement Learning Thompson
 sampling algorithm to solve the incentives' problem.
 """
 
+import numpy as np
 from marl_incentives import environment as env
 from marl_incentives import traveller as tr
 from marl_incentives import utils as ut
@@ -85,6 +86,8 @@ def main(config, total_budget: int) -> None:
 
         # Update Q function for each agent
         for driver in drivers:
+            if i == 500:
+                driver.estimated_stds = np.full(len(driver.costs) + 1, 1)
             # Unpack actions index
             idx = actions_index[driver.trip_id]
             # Compute reward
@@ -111,7 +114,9 @@ def main(config, total_budget: int) -> None:
 
     # Save the plot and pickle file for TTT and emissions
     base_name = (
-        "compliance_rate_exp_replay" if config["compliance_rate"] else "exp_replay"
+        "compliance_rate_thompson_sampling"
+        if config["compliance_rate"]
+        else "thompson_sampling"
     )
     ut.save_metric(
         ttts, labels_dict, base_name + "_ttt", "TTT [h]", total_budget, weights

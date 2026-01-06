@@ -2,7 +2,7 @@
 episodes: 750
 
 # True if using compliance rate, false otherwise
-compliance_rate: true
+compliance_rate: false
 
 # True if using Upper Confidence Bound for action selection
 upper_confidence_bound: true

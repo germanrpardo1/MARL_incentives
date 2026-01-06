@@ -432,7 +432,7 @@ def policy_incentives(
             x = [(driver.costs[index] - min(driver.costs)) / 60]  # In minutes
             # Probability of accepting incentivised path
             prob = ut.logistic_prob(x, coefficients)
-            prob = 1
+            prob = 0.8
             if _rng.random() >= prob:
                 # Route not accepted, select shortest path
                 _, edges, incentive = select_default_route(driver)
