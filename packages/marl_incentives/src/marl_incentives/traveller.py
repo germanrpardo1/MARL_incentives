@@ -45,7 +45,12 @@ class Driver:
         self.t = 0
 
         self.estimated_means = np.append(np.array(costs), min(costs))
-        self.estimated_stds = np.full(len(self.costs) + 1, 20)
+        self.estimated_stds = np.full(len(self.costs) + 1, 1)
+        self.estimated_vars = np.full(len(self.costs) + 1, 1)
+        self.estimated_means = np.full(len(self.costs) + 1, 0.0)
+        self.kappas = np.full(len(self.costs) + 1, 1e-3)
+        self.alphas = np.full(len(self.costs) + 1, 1.0)
+        self.betas = np.full(len(self.costs) + 1, 1.0)
 
         if not thompson_sampling_method:
             # Initialise the Q-table

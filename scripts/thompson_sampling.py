@@ -3,7 +3,6 @@ This script runs the multi-agent Reinforcement Learning Thompson
 sampling algorithm to solve the incentives' problem.
 """
 
-import numpy as np
 from marl_incentives import environment as env
 from marl_incentives import traveller as tr
 from marl_incentives import utils as ut
@@ -84,19 +83,27 @@ def main(config, total_budget: int) -> None:
         ttts.append(total_tt)
         emissions_total.append(total_em)
 
-        # Update Q function for each agent
         for driver in drivers:
-            if i == 500:
-                driver.estimated_stds = np.full(len(driver.costs) + 1, 1)
-            # Unpack actions index
             idx = actions_index[driver.trip_id]
-            # Compute reward
+
             reward = driver.compute_reward(ind_tt, ind_em, total_tt, total_em, weights)
 
-            # Update mean estimate based on the reward
-            driver.estimated_means[idx] = driver.estimated_means[idx] + (
-                reward - driver.estimated_means[idx]
-            ) / (driver.action_counts[idx] + 1)
+            # Shorthands
+            mu = driver.estimated_means[idx]
+            kappa = driver.kappas[idx]
+            alpha = driver.alphas[idx]
+            beta = driver.betas[idx]
+
+            # ---- Bayesian Thompson Sampling update ----
+            kappa_new = kappa + 1
+            mu_new = (kappa * mu + reward) / kappa_new
+            alpha_new = alpha + 0.5
+            beta_new = beta + (kappa * (reward - mu) ** 2) / (2 * kappa_new)
+
+            driver.estimated_means[idx] = mu_new
+            driver.kappas[idx] = kappa_new
+            driver.alphas[idx] = alpha_new
+            driver.betas[idx] = beta_new
 
         # Log progress
         ut.log_progress(i=i, episodes=config["episodes"], ttts=ttts)
