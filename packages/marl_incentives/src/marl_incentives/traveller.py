@@ -47,7 +47,7 @@ class Driver:
         self.estimated_means = np.append(np.array(costs), min(costs))
         self.estimated_stds = np.full(len(self.costs) + 1, 1)
         self.estimated_vars = np.full(len(self.costs) + 1, 1)
-        self.estimated_means = np.full(len(self.costs) + 1, 0.0)
+        # self.estimated_means = np.full(len(self.costs) + 1, 0.0)
         self.kappas = np.full(len(self.costs) + 1, 1e-3)
         self.alphas = np.full(len(self.costs) + 1, 1.0)
         self.betas = np.full(len(self.costs) + 1, 1.0)
@@ -166,11 +166,16 @@ class Driver:
 
     def thompson_sampling(self) -> tuple[list, int, int, float]:
         """pass."""
+        # Sample variances from Inverse-Gamma
+        sigma2 = 1.0 / np.random.gamma(self.alphas, 1.0 / self.betas)
 
+        # Sample means conditioned on variances
         samples_travel_times = np.random.normal(
-            loc=self.estimated_means, scale=self.estimated_stds
+            loc=self.estimated_means, scale=np.sqrt(sigma2 / self.kappas)
         )
+
         action_index = int(np.argmin(samples_travel_times))
+
         num_routes = len(self.costs)
 
         adjusted_costs = self.costs.copy()

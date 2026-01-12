@@ -24,13 +24,6 @@ def main(config, total_budget: int) -> None:
         "total_emissions": config["total_emissions_weight"],
     }
 
-    # RL hyper-parameters
-    hyperparams = {
-        "epsilon": config["epsilon"],
-        "decay": config["decay"],
-        "alpha": config["alpha"],
-    }
-
     # Dictionary with all paths
     paths_dict = config["paths_dict"]
     # Define edge data granularity
@@ -66,7 +59,6 @@ def main(config, total_budget: int) -> None:
             tr.policy_incentives(
                 drivers=drivers,
                 total_budget=total_budget,
-                epsilon=hyperparams["epsilon"],
                 compliance_rate=config["compliance_rate"],
                 thompson_sampling=True,
             )
@@ -107,12 +99,6 @@ def main(config, total_budget: int) -> None:
 
         # Log progress
         ut.log_progress(i=i, episodes=config["episodes"], ttts=ttts)
-
-        if not config["upper_confidence_bound"]:
-            # Reduce epsilon
-            hyperparams["epsilon"] = max(
-                0.01, hyperparams["epsilon"] * hyperparams["decay"]
-            )
 
         # Update travel times
         ut.update_average_travel_times(
