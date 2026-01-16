@@ -445,12 +445,12 @@ def policy_incentives(
 
             if _rng.random() >= prob:
                 # Route not accepted, select shortest path
-                _, edges, incentive = select_default_route(driver)
+                index, edges, incentive = select_default_route(driver)
                 path_accepted = False
 
         # --- Step 3: Enforce budget limit ---
         if current_used_budget + incentive > total_budget:
-            _, edges, incentive = select_default_route(driver)
+            index, edges, incentive = select_default_route(driver)
             path_accepted = False
 
         # --- Step 4: Update trackers ---
