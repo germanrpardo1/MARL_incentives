@@ -19,7 +19,6 @@ incentives_mode: True
 # Total available budget for incentives or policies (can be used as a constraint)
 total_budget:
   - 100000000
-  - 50000
 # Select route selection strategy
 strategy: "logit"
 # Store all the paths
