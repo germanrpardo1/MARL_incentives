@@ -14,7 +14,7 @@ from marl_incentives.traveller import Driver
 
 def experience_replay(
     network_env: Network, drivers: list[Driver], weights, hyperparams
-) -> float:
+) -> tuple[float, float]:
     """pass."""
     epsilon = hyperparams["epsilon"]
     decay = hyperparams["decay"]
@@ -31,9 +31,10 @@ def experience_replay(
             alpha=hyperparams["alpha"],
         )
 
-        # Reduce epsilon
-        epsilon = max(0.01, epsilon * decay)
-    return epsilon
+    # Reduce epsilon and alpha
+    epsilon = max(0.01, epsilon * decay)
+    alpha = max(0.005, hyperparams["alpha"] * 0.9995)
+    return epsilon, alpha
 
 
 def main(config, total_budget: int) -> None:
@@ -104,7 +105,7 @@ def main(config, total_budget: int) -> None:
 
         # If there are enough observations in the buffer, sample and update Qs
         if len(network_env.buffer) >= network_env.buffer.batch_size:
-            hyperparams["epsilon"] = experience_replay(
+            hyperparams["epsilon"], hyperparams["alpha"] = experience_replay(
                 network_env, drivers, weights, hyperparams
             )
 

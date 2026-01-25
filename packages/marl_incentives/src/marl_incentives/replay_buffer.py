@@ -95,11 +95,12 @@ class StateReplayBuffer:
         total_tt, ind_tt, ind_em, total_em = reward
         for driver in drivers:
             idx = action_index[driver.trip_id]
+            index_state = state_index[driver.trip_id]
             # Compute reward
             reward = driver.compute_reward(ind_tt, ind_em, total_tt, total_em, weights)
             # Update Q-value
-            driver.q_values[state_index][idx] = (1 - alpha) * driver.q_values[
-                state_index
+            driver.q_values[index_state][idx] = (1 - alpha) * driver.q_values[
+                index_state
             ][idx] + alpha * reward
 
     def __len__(self) -> int:

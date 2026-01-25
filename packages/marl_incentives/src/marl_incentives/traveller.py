@@ -504,12 +504,9 @@ def policy_incentives_discrete_state(
         else:
             driver.state = 1
 
-        state = total_budget - current_used_budget
-        n = int(np.floor((state / total_budget) * 2) - 1)
-        # driver.state = n
         # --- Step 1: Base action via epsilon-greedy ---
         edges, _, index, incentive = driver.eps_greedy_policy_incentives_discrete_state(
-            epsilon, n
+            epsilon, driver.state
         )
 
         # --- Step 2: Apply compliance rate randomness ---

@@ -61,7 +61,7 @@ def main(config, total_budget: int) -> None:
         )
 
         reward_tuple = [(60**2) * total_tt / 1100, ind_tt, ind_em, total_em]
-        states_tuple = [driver.state for driver in drivers]
+        states_tuple = {driver.trip_id: driver.state for driver in drivers}
         network_env.buffer.push(states_tuple, actions_index, reward_tuple)
 
         # Record TTT and total emissions throughout iterations
@@ -119,6 +119,10 @@ def main(config, total_budget: int) -> None:
         total_budget,
         weights,
     )
+    q_values_all = [driver.q_values for driver in drivers]
+    with open("q_values_all.txt", "w") as f:
+        for q in q_values_all:
+            f.write(str(q) + "\n")
 
 
 if __name__ == "__main__":

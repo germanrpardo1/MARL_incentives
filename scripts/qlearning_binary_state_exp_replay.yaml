@@ -1,5 +1,5 @@
 # Number of training episodes for the RL agent
-episodes: 750
+episodes: 500
 
 # True if using compliance rate, false otherwise
 compliance_rate: false
@@ -19,9 +19,9 @@ buffer_capacity: 1
 batch_size: 1
 
 # Exploration rate for epsilon-greedy policy
-epsilon: 0.8
+epsilon: 0.9
 # Epsilon decay rate per episode (to reduce exploration over time)
-decay: 0.992
+decay: 0.994
 # Learning rate (α) for Q-learning
 alpha: 0.1
 # Total available budget for incentives or policies (can be used as a constraint)
