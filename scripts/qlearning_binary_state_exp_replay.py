@@ -33,6 +33,8 @@ def main(config, total_budget: int) -> None:
 
     ttts = []
     emissions_total = []
+    current_used_budgets = []
+    acceptance_rates = []
     labels_dict = {}
 
     # Instantiate network object
@@ -48,13 +50,16 @@ def main(config, total_budget: int) -> None:
     # Start training loop for RL agents
     for i in range(config["episodes"]):
         # Get action from policy for every driver
-        routes_edges, actions_index = tr.policy_incentives_discrete_state(
-            drivers,
-            total_budget=total_budget,
-            epsilon=hyperparams["epsilon"],
-            compliance_rate=config["compliance_rate"],
+        routes_edges, actions_index, current_used_budget, acceptance_rate = (
+            tr.policy_incentives_discrete_state(
+                drivers,
+                total_budget=total_budget,
+                epsilon=hyperparams["epsilon"],
+                compliance_rate=config["compliance_rate"],
+            )
         )
-
+        acceptance_rates.append(acceptance_rate)
+        current_used_budgets.append(current_used_budget)
         # Perform actions given by policy
         total_tt, ind_tt, ind_em, total_em = network_env.step(
             routes_edges=routes_edges,
@@ -101,12 +106,14 @@ def main(config, total_budget: int) -> None:
 
     # Save the plot and pickle file for TTT and emissions
     base_name = (
-        "compliance_rate_exp_replay" if config["compliance_rate"] else "exp_replay"
+        "compliance_rate_exp_replay_binary_state"
+        if config["compliance_rate"]
+        else "exp_replay_binary_state"
     )
     ut.save_metric(
         ttts,
         labels_dict,
-        base_name + "_discrete_state" + "_ttt",
+        base_name + "_ttt",
         "TTT [h]",
         total_budget,
         weights,
@@ -114,15 +121,27 @@ def main(config, total_budget: int) -> None:
     ut.save_metric(
         emissions_total,
         labels_dict,
-        base_name + "_discrete_state" + "_emissions",
+        base_name + "_emissions",
         "Emissions [kg]",
         total_budget,
         weights,
     )
-    q_values_all = [driver.q_values for driver in drivers]
-    with open("q_values_all.txt", "w") as f:
-        for q in q_values_all:
-            f.write(str(q) + "\n")
+    ut.save_metric(
+        current_used_budgets,
+        labels_dict,
+        base_name + "_used_budget",
+        "Budget",
+        total_budget,
+        weights,
+    )
+    ut.save_metric(
+        acceptance_rates,
+        labels_dict,
+        base_name + "_acceptance_rates",
+        "Acceptance rates",
+        total_budget,
+        weights,
+    )
 
 
 if __name__ == "__main__":

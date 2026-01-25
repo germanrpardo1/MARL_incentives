@@ -26,6 +26,8 @@ decay: 0.994
 alpha: 0.1
 # Total available budget for incentives or policies (can be used as a constraint)
 total_budget:
+  - 30000
+  - 50000
   - 100000000
 # Select route selection strategy
 strategy: "logit"

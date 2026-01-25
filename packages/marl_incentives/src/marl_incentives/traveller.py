@@ -478,7 +478,7 @@ def policy_incentives_discrete_state(
     total_budget: float,
     epsilon: float,
     compliance_rate: bool = False,
-) -> tuple[dict[str, list], dict[str, tuple]]:
+) -> tuple[dict[str, list], dict[str, tuple], float, float]:
     """
     Apply an epsilon-greedy policy for route and incentive selection.
 
@@ -494,8 +494,13 @@ def policy_incentives_discrete_state(
     route_edges = {}
     actions_index = {}
     current_used_budget = 0.0
+    total_accepted_paths = 0
+    total_incentivised_paths = 0
 
     for driver in drivers:
+        path_accepted = True
+        num_routes = len(driver.costs)
+
         remaining = total_budget - current_used_budget
         ratio_left = remaining / total_budget
 
@@ -520,18 +525,29 @@ def policy_incentives_discrete_state(
             prob = ut.logistic_prob(x, coefficients)
             if _rng.random() >= prob:
                 # Route not accepted, select shortest path
+                path_accepted = False
                 index, edges, incentive = select_default_route(driver)
 
         # --- Step 3: Enforce budget limit ---
         if current_used_budget + incentive > total_budget:
+            path_accepted = False
             index, edges, incentive = select_default_route(driver)
 
         # --- Step 4: Update trackers ---
         current_used_budget += incentive
         route_edges[driver.trip_id] = edges
         actions_index[driver.trip_id] = index
+        if index < num_routes:
+            total_incentivised_paths += 1
+            if path_accepted:
+                total_accepted_paths += 1
 
-    return route_edges, actions_index
+    return (
+        route_edges,
+        actions_index,
+        current_used_budget,
+        total_accepted_paths / total_incentivised_paths,
+    )
 
 
 class DQNStateDriver:
