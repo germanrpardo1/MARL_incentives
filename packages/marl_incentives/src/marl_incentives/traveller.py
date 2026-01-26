@@ -44,35 +44,32 @@ class Driver:
         self.action_counts = np.zeros(len(self.costs))
         self.t = 0
 
-        self.estimated_means = np.append(np.array(costs), min(costs))
-        self.estimated_stds = np.full(len(self.costs) + 1, 1)
-        self.estimated_vars = np.full(len(self.costs) + 1, 1)
-        # self.estimated_means = np.full(len(self.costs) + 1, 0.0)
-        self.kappas = np.full(len(self.costs) + 1, 1e-3)
-        self.alphas = np.full(len(self.costs) + 1, 1.0)
-        self.betas = np.full(len(self.costs) + 1, 1.0)
-
         if not thompson_sampling_method:
             # Initialise the Q-table
             if incentives_mode and state_variable:
                 self.q_values = np.zeros((2, len(self.costs) + 1))
                 self.state = 0
                 self.action_counts = np.zeros(len(self.costs) + 1)
+
             elif incentives_mode and not state_variable:
                 self.q_values = np.zeros((len(self.costs) + 1))
                 self.action_counts = np.zeros(len(self.costs) + 1)
+
             elif not incentives_mode and state_variable:
                 self.q_values = np.zeros((2, len(self.costs)))
                 self.state = 0
                 self.action_counts = np.zeros(len(self.costs))
+
             else:
                 self.q_values = np.zeros(len(self.costs))
                 self.action_counts = np.zeros(len(self.costs))
+
         else:
+            self.estimated_means = np.append(np.array(costs), min(costs))
+            self.kappas = np.full(len(self.costs) + 1, 1e-3)
+            self.alphas = np.full(len(self.costs) + 1, 1.0)
+            self.betas = np.full(len(self.costs) + 1, 1.0)
             self.action_counts = np.zeros(len(self.costs) + 1)
-            self.means = costs
-            self.stds = np.ones(len(self.costs))
-            self.reward_stds = np.ones(len(self.costs))
 
     def eps_greedy_policy_no_incentives(self, epsilon: float) -> tuple[list, int]:
         """

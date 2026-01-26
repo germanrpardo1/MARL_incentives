@@ -12,12 +12,8 @@ from marl_incentives.environment import Network
 from marl_incentives.traveller import Driver
 
 
-def experience_replay(
-    network_env: Network, drivers: list[Driver], weights, hyperparams
-) -> tuple[float, float]:
+def experience_replay(network_env: Network, drivers: list[Driver], weights) -> None:
     """pass."""
-    epsilon = hyperparams["epsilon"]
-    decay = hyperparams["decay"]
     # Sample past observations from replay buffer
     acts, rewards = network_env.buffer.sample(network_env.buffer.batch_size)
     for a, r in zip(acts, rewards):
@@ -28,13 +24,7 @@ def experience_replay(
             action_index=a,
             reward=r,
             weights=weights,
-            alpha=hyperparams["alpha"],
         )
-
-    # Reduce epsilon and alpha
-    epsilon = max(0.01, epsilon * decay)
-    alpha = max(0.005, hyperparams["alpha"] * 0.9995)
-    return epsilon, alpha
 
 
 def main(config, total_budget: int) -> None:
@@ -71,6 +61,9 @@ def main(config, total_budget: int) -> None:
         batch_size=config["batch_size"],
     )
 
+    epsilon = hyperparams["epsilon"]
+    decay = hyperparams["decay"]
+
     # Start training loop for RL agents
     for i in range(config["episodes"]):
         # Get action from policy for every driver with incentives mode
@@ -79,7 +72,7 @@ def main(config, total_budget: int) -> None:
                 tr.policy_incentives(
                     drivers=drivers,
                     total_budget=total_budget,
-                    epsilon=hyperparams["epsilon"],
+                    epsilon=epsilon,
                     compliance_rate=config["compliance_rate"],
                 )
             )
@@ -87,9 +80,7 @@ def main(config, total_budget: int) -> None:
             current_used_budgets.append(current_used_budget)
         # Take action from policy for every driver without incentives mode
         else:
-            routes_edges, actions_index = tr.policy_no_incentives(
-                drivers, hyperparams["epsilon"]
-            )
+            routes_edges, actions_index = tr.policy_no_incentives(drivers, epsilon)
 
         # Perform actions given by policy
         total_tt, ind_tt, ind_em, total_em = network_env.step(
@@ -105,9 +96,9 @@ def main(config, total_budget: int) -> None:
 
         # If there are enough observations in the buffer, sample and update Qs
         if len(network_env.buffer) >= network_env.buffer.batch_size:
-            hyperparams["epsilon"], hyperparams["alpha"] = experience_replay(
-                network_env, drivers, weights, hyperparams
-            )
+            experience_replay(network_env, drivers, weights)
+        # Reduce epsilon
+        epsilon = max(0.01, epsilon * decay)
 
         # Log progress
         ut.log_progress(i=i, episodes=config["episodes"], ttts=ttts)

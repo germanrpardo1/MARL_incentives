@@ -46,6 +46,7 @@ def main(config, total_budget: int) -> None:
         batch_size=config["batch_size"],
         state_mode=True,
     )
+    # TODO(GP): add alpha per state-action pair, and state-action counts pair
 
     # Start training loop for RL agents
     for i in range(config["episodes"]):

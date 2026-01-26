@@ -39,12 +39,19 @@ class ReplayBuffer:
 
     @staticmethod
     def update_q_values(
-        drivers: list, action_index, reward, weights: dict, alpha: float
+        drivers: list,
+        action_index,
+        reward,
+        weights: dict,
     ):
         """complete."""
         total_tt, ind_tt, ind_em, total_em = reward
         for driver in drivers:
             idx = action_index[driver.trip_id]
+            # Update action counts
+            driver.action_counts[idx] += 1
+            # Calculate alpha based on action counts
+            alpha = 1 / driver.action_counts[idx]
             # Compute reward
             reward = driver.compute_reward(ind_tt, ind_em, total_tt, total_em, weights)
             # Update Q-value

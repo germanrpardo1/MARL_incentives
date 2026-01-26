@@ -25,7 +25,7 @@ def save_plot_and_file(
     labels: dict,
     path_to_pickle: str,
     path_to_plot: str,
-    window: int = 30,
+    window: int = 50,
 ) -> None:
     """
     Save a plot of the moving average and a pickle file of raw values.
@@ -366,7 +366,7 @@ def save_metric(
     save_plot_and_file(
         values=values,
         labels=labels,
-        window=30,
+        window=50,
         path_to_pickle=pickle_path,
         path_to_plot=plot_path,
     )
