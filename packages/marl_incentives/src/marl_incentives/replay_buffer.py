@@ -96,13 +96,17 @@ class StateReplayBuffer:
 
     @staticmethod
     def update_q_values_discrete_state(
-        drivers: list, state_index, action_index, reward, weights: dict, alpha: float
+        drivers: list, state_index, action_index, reward, weights: dict
     ):
         """complete."""
         total_tt, ind_tt, ind_em, total_em = reward
         for driver in drivers:
             idx = action_index[driver.trip_id]
             index_state = state_index[driver.trip_id]
+            # Update state-action pairs counts
+            driver.state_action_counts[index_state][idx] += 1
+            # Calculate alpha based on state-action counts
+            alpha = 1 / driver.state_action_counts[index_state][idx]
             # Compute reward
             reward = driver.compute_reward(ind_tt, ind_em, total_tt, total_em, weights)
             # Update Q-value

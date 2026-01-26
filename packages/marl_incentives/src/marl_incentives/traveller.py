@@ -49,7 +49,7 @@ class Driver:
             if incentives_mode and state_variable:
                 self.q_values = np.zeros((2, len(self.costs) + 1))
                 self.state = 0
-                self.action_counts = np.zeros(len(self.costs) + 1)
+                self.state_action_counts = np.zeros((2, len(self.costs) + 1))
 
             elif incentives_mode and not state_variable:
                 self.q_values = np.zeros((len(self.costs) + 1))
@@ -58,7 +58,7 @@ class Driver:
             elif not incentives_mode and state_variable:
                 self.q_values = np.zeros((2, len(self.costs)))
                 self.state = 0
-                self.action_counts = np.zeros(len(self.costs))
+                self.state_action_counts = np.zeros((2, len(self.costs)))
 
             else:
                 self.q_values = np.zeros(len(self.costs))
