@@ -36,7 +36,7 @@ def save_plot_and_file(
     :param path_to_plot: Path to the plots.
     :param window: Window size for moving average.
     """
-    if os.path.exists(path_to_pickle) or os.path.exists(path_to_plot) or not values:
+    if not values:
         return
 
     arr = np.array(values)

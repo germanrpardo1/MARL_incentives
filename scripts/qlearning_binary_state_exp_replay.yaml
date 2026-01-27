@@ -15,13 +15,14 @@ emissions_weight: 0
 total_emissions_weight: 0
 
 # Buffer capacity for experience replay
-buffer_capacity: 1
-batch_size: 1
+buffer_capacity: 64
+batch_size: 32
 
 # Exploration rate for epsilon-greedy policy
 epsilon: 0.9
 # Epsilon decay rate per episode (to reduce exploration over time)
-decay: 0.994
+decay: 0.995
+
 # Learning rate (α) for Q-learning
 alpha: 0.1
 # Total available budget for incentives or policies (can be used as a constraint)
