@@ -52,6 +52,7 @@ class ReplayBuffer:
             driver.action_counts[idx] += 1
             # Calculate alpha based on action counts
             alpha = 1 / driver.action_counts[idx]
+            alpha = 0.01
             # Compute reward
             reward = driver.compute_reward(ind_tt, ind_em, total_tt, total_em, weights)
             # Update Q-value
@@ -107,6 +108,7 @@ class StateReplayBuffer:
             driver.state_action_counts[index_state][idx] += 1
             # Calculate alpha based on state-action counts
             alpha = 1 / driver.state_action_counts[index_state][idx]
+            alpha = 0.01
             # Compute reward
             reward = driver.compute_reward(ind_tt, ind_em, total_tt, total_em, weights)
             # Update Q-value
