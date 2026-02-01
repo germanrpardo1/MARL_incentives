@@ -13,7 +13,9 @@ from marl_incentives.environment import Network
 from marl_incentives.traveller import Driver
 
 
-def experience_replay(network_env: Network, drivers: list[Driver], weights) -> None:
+def experience_replay(
+    network_env: Network, drivers: list[Driver], weights, alpha: float | None
+) -> None:
     """pass."""
     # Sample past observations from replay buffer
     states, acts, rewards = network_env.buffer.sample(network_env.buffer.batch_size)
@@ -26,6 +28,7 @@ def experience_replay(network_env: Network, drivers: list[Driver], weights) -> N
             action_index=a,
             reward=r,
             weights=weights,
+            alpha=alpha,
         )
 
 
@@ -96,7 +99,7 @@ def main(config, total_budget: int) -> None:
 
         # If there are enough observations in the buffer, sample and update Qs
         if len(network_env.buffer) >= network_env.buffer.batch_size:
-            experience_replay(network_env, drivers, weights)
+            experience_replay(network_env, drivers, weights, hyperparams["alpha"])
 
         # Reduce epsilon
         epsilon = max(0.01, epsilon * decay)

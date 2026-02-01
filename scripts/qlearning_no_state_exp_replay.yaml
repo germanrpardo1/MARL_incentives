@@ -24,7 +24,8 @@ epsilon: 0.9
 # Epsilon decay rate per episode (to reduce exploration over time)
 decay: 0.995
 
-alpha: 0.1
+# Learning rate (α) for Q-learning
+alpha: 0.01
 # Total available budget for incentives or policies (can be used as a constraint)
 total_budget:
   - 10000

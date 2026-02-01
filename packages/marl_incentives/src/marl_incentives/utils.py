@@ -386,7 +386,7 @@ def unpack_config(config: dict) -> tuple[dict, dict, dict, int, dict]:
     hyperparams = {
         "epsilon": config["epsilon"],
         "decay": config["decay"],
-        "alpha": config["alpha"],
+        "alpha": config["alpha"] if config["alpha"] else None,
     }
 
     # Dictionary with all paths

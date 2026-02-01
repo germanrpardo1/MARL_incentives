@@ -43,6 +43,7 @@ class ReplayBuffer:
         action_index,
         reward,
         weights: dict,
+        alpha: float | None,
     ):
         """complete."""
         total_tt, ind_tt, ind_em, total_em = reward
@@ -51,8 +52,9 @@ class ReplayBuffer:
             # Update action counts
             driver.action_counts[idx] += 1
             # Calculate alpha based on action counts
-            alpha = 1 / driver.action_counts[idx]
-            alpha = 0.01
+            if not alpha:
+                alpha = 1 / driver.action_counts[idx]
+
             # Compute reward
             reward = driver.compute_reward(ind_tt, ind_em, total_tt, total_em, weights)
             # Update Q-value
@@ -97,7 +99,12 @@ class StateReplayBuffer:
 
     @staticmethod
     def update_q_values_discrete_state(
-        drivers: list, state_index, action_index, reward, weights: dict
+        drivers: list,
+        state_index,
+        action_index,
+        reward,
+        weights: dict,
+        alpha: float | None,
     ):
         """complete."""
         total_tt, ind_tt, ind_em, total_em = reward
@@ -107,8 +114,9 @@ class StateReplayBuffer:
             # Update state-action pairs counts
             driver.state_action_counts[index_state][idx] += 1
             # Calculate alpha based on state-action counts
-            alpha = 1 / driver.state_action_counts[index_state][idx]
-            alpha = 0.01
+            if not alpha:
+                alpha = 1 / driver.state_action_counts[index_state][idx]
+
             # Compute reward
             reward = driver.compute_reward(ind_tt, ind_em, total_tt, total_em, weights)
             # Update Q-value
