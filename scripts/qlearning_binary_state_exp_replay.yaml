@@ -1,5 +1,5 @@
 # Number of training episodes for the RL agent
-episodes: 2
+episodes: 750
 
 # True if using compliance rate, false otherwise
 compliance_rate: true

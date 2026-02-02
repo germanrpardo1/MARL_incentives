@@ -145,7 +145,7 @@ def main(config, total_budget: int) -> None:
     ut.save_metric(
         acceptance_rates,
         labels_dict,
-        base_name + "_acceptance_rates",
+        base_name + "_acc_rates",
         "Acceptance rates",
         total_budget,
         weights,
