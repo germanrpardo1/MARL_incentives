@@ -29,6 +29,8 @@ This is intentionally SIMPLE but clean and scalable.
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
+from marl_incentives import traveller as tr
+from marl_incentives.environment import Network
 
 # ============================================================
 # CONFIG
@@ -75,43 +77,45 @@ class SimulatorDataset(Dataset):
         [N, 1101]
     """
 
-    def __init__(self, num_samples=10000):
-        self.X = self.generate_actions(num_samples)
-        self.Y = self.generate_targets(self.X)
+    def __init__(self, drivers, network_env, num_samples=10):
+        self.X = self.generate_actions(drivers, num_samples)
+        self.Y = self.generate_targets(self.X, drivers, network_env)
 
     @staticmethod
-    def generate_actions(num_samples):
+    def generate_actions(drivers, num_samples):
         actions = torch.zeros((num_samples, NUM_AGENTS), dtype=torch.long)
 
-        for agent_id in range(NUM_AGENTS):
-            n_actions = agent_num_actions[agent_id].item()
+        for i, driver in enumerate(drivers):
+            n_actions = len(driver.costs)
 
-            actions[:, agent_id] = torch.randint(
-                low=0, high=n_actions, size=(num_samples,)
-            )
+            actions[:, i] = torch.randint(low=0, high=n_actions, size=(num_samples,))
 
         return actions
 
     @staticmethod
-    def generate_targets(X):
+    def generate_targets(X, drivers, network_env):
         # ----------------------------------------------------
         # FAKE SIMULATOR
         # Replace this block with your simulator outputs
         # ----------------------------------------------------
+        edges = {}
+        for i, driver in enumerate(drivers):
+            edges[driver.trip_id] = []
+            for j in range(len(X)):
+                action_idx = X[j, i]
+                edges[driver.trip_id].append(driver.routes[action_idx][1])
 
-        individual_tt = X.float() * 2.0
+        for j in range(len(X)):
+            all_edges = {}
+            for driver in drivers:
+                all_edges[driver.trip_id] = edges[driver.trip_id][j]
 
-        # fake global congestion effect
-        congestion = X.float().mean(dim=1, keepdim=True)
+            total_tt, ind_tt, ind_em, total_em = network_env.step(
+                routes_edges=all_edges,
+            )
 
-        individual_tt += congestion
-
-        # small noise
-        individual_tt += 0.1 * torch.randn_like(individual_tt)
-
-        total_tt = individual_tt.sum(dim=1, keepdim=True)
-
-        Y = torch.cat([individual_tt, total_tt], dim=1)
+        # TODO(German): Here need to put ALL the ind_tt and total_tt from all rows.
+        Y = torch.cat([ind_tt, total_tt], dim=1)
 
         return Y
 
@@ -222,11 +226,53 @@ class SurrogateModel(nn.Module):
 
 
 def main():
+    # Unpack configuration file
+    # Store all the paths
+    paths_dict = {
+        # Path of output.rou.alt file
+        "output_rou_alt_path": "data/output.rou.alt.xml",
+        # Path of output.rou file
+        "routes_file_path": "data/output.rou.xml",
+        # Path for edge data frequency config
+        "edge_data_path": "data/edge_data.add.xml",
+        # Path for SUMO log
+        "log_path": "data/log.xml",
+        # Path to write emissions data
+        "emissions_path": "data/fcd.xml",
+        # Path to emissions data per vehicle
+        "emissions_per_vehicle_path": "data/emissions_per_vehicle.txt",
+        # Path to stats data after simulation
+        "stats_path": "data/stats.xml",
+        # Path to tripinfo file
+        "trip_info_path": "data/tripinfo.xml",
+        "edges_weights_path": "weights.xml",
+    }
+
+    sumo_params = {
+        "config_path": "data/config.sumocfg",
+        "network_path": "data/kamppi.net.xml",
+        "routes_path": "data/output.rou.xml",
+    }
+    # Initialise all drivers
+    drivers = tr.initialise_drivers(
+        actions_file_path=paths_dict["output_rou_alt_path"],
+        incentives_mode=True,
+        strategy="logit",
+    )
+
+    # Instantiate network object
+    network_env = Network(
+        paths_dict=paths_dict,
+        sumo_params=sumo_params,
+        edge_data_frequency=500,
+        buffer_capacity=64,
+        batch_size=32,
+    )
     # ============================================================
     # DATA
     # ============================================================
 
-    dataset = SimulatorDataset(num_samples=5000)
+    dataset = SimulatorDataset(drivers, network_env, num_samples=10)
 
     loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
