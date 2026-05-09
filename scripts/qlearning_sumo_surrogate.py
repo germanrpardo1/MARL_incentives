@@ -9,21 +9,78 @@ from marl_incentives import traveller as tr
 from marl_incentives import utils as ut
 from marl_incentives import xml_manipulation as xml
 from marl_incentives.environment import Network
-from marl_incentives.traveller import Driver
+from sumo_surrogate import SurrogateModel, SimulatorDataset
+import torch
 
 
-def experience_replay(
-    network_env: Network, drivers: list[Driver], weights, alpha: float | None
-) -> None:
-    """pass."""
-    # Sample past observations from replay buffer
-    acts, rewards = network_env.buffer.sample(network_env.buffer.batch_size)
-    for a, r in zip(acts, rewards):
-        # For each agent update Q function
-        # Q(a) = (1 - alpha) * Q(a) + alpha * r
-        network_env.buffer.update_q_values(
-            drivers=drivers, action_index=a, reward=r, weights=weights, alpha=alpha
-        )
+def pre_train(surrogate: SurrogateModel, config, DEVICE, drivers, network_env):
+    surrogate_dataset = SimulatorDataset(
+        drivers=drivers,
+        network_env=network_env,
+        num_samples=config.get("surrogate_dataset_size", 10),
+    )
+
+    surrogate.set_base_dataset(
+        surrogate_dataset.X,
+        surrogate_dataset.Y,
+    )
+
+    train_loader = torch.utils.data.DataLoader(
+        surrogate_dataset,
+        batch_size=config.get("surrogate_batch_size", 32),
+        shuffle=True,
+    )
+
+    optimizer = torch.optim.Adam(
+        surrogate.parameters(),
+        lr=config.get("surrogate_lr", 1e-3),
+    )
+
+    mse = torch.nn.MSELoss()
+
+    print("Pretraining surrogate...")
+
+    surrogate.train()
+
+    for epoch in range(config.get("surrogate_pretrain_epochs", 10)):
+        total_loss = 0.0
+
+        for batch_X, batch_Y in train_loader:
+            batch_X = batch_X.to(DEVICE)
+            batch_Y = batch_Y.to(DEVICE)
+
+            pred = surrogate(batch_X)
+
+            pred_individual = pred[:, : len(drivers)]
+            pred_total = pred[:, -1]
+
+            true_individual = batch_Y[:, : len(drivers)]
+            true_total = batch_Y[:, -1]
+
+            loss_individual = mse(
+                pred_individual,
+                true_individual,
+            )
+
+            loss_total = mse(
+                pred_total,
+                true_total,
+            )
+
+            loss = loss_individual + 5.0 * loss_total
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item()
+
+        avg_loss = total_loss / len(train_loader)
+
+        print(f"[Surrogate Pretrain] Epoch {epoch + 1:02d} | Loss = {avg_loss:.6f}")
+
+    print("Surrogate pretraining complete.")
+    return surrogate
 
 
 def main(config, total_budget: int) -> None:
@@ -36,6 +93,20 @@ def main(config, total_budget: int) -> None:
     # Unpack configuration file
     weights, hyperparams, paths_dict, edge_data_frequency, sumo_params = (
         ut.unpack_config(config)
+    )
+
+    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+    DYNA_STEPS = config.get("dyna_steps", 20)
+
+    SURROGATE_RETRAIN_FREQ = config.get(
+        "surrogate_retrain_freq",
+        25,
+    )
+
+    SURROGATE_RETRAIN_EPOCHS = config.get(
+        "surrogate_retrain_epochs",
+        2,
     )
 
     # Initialise all drivers
@@ -60,10 +131,18 @@ def main(config, total_budget: int) -> None:
         batch_size=config["batch_size"],
     )
 
+    # Define surrogate model for SUMO
+    surrogate = SurrogateModel().to(DEVICE)
+
+    # Pre train surrogate model
+    surrogate = pre_train(surrogate, config, DEVICE, drivers, network_env)
+
     epsilon = hyperparams["epsilon"]
     decay = hyperparams["decay"]
 
-    # Start training loop for RL agents
+    # ============================================================
+    # START RL TRAINING
+    # ============================================================
     for i in range(config["episodes"]):
         # Get action from policy for every driver with incentives mode
         if config["incentives_mode"]:
@@ -75,42 +154,169 @@ def main(config, total_budget: int) -> None:
                     compliance_rate=config["compliance_rate"],
                 )
             )
+
             acceptance_rates.append(acceptance_rate)
             current_used_budgets.append(current_used_budget)
+
         # Take action from policy for every driver without incentives mode
         else:
-            routes_edges, actions_index = tr.policy_no_incentives(drivers, epsilon)
+            routes_edges, actions_index = tr.policy_no_incentives(
+                drivers,
+                epsilon,
+            )
 
-        # Perform actions given by policy
+        # --------------------------------------------------------
+        # Execute REAL simulator step
+        # --------------------------------------------------------
+
         total_tt, ind_tt, ind_em, total_em = network_env.step(
             routes_edges=routes_edges,
         )
 
-        reward_tuple = [(60**2) * total_tt / 1100, ind_tt, ind_em, total_em]
-        network_env.buffer.push(actions_index, reward_tuple)
+        # --------------------------------------------------------
+        # Store metrics
+        # --------------------------------------------------------
 
-        # Record TTT and total emissions throughout iterations
         ttts.append(total_tt)
         emissions_total.append(total_em)
 
-        # If there are enough observations in the buffer, sample and update Qs
-        if len(network_env.buffer) >= network_env.buffer.batch_size:
-            experience_replay(network_env, drivers, weights, hyperparams["alpha"])
+        # --------------------------------------------------------
+        # Build training target for surrogate replay
+        # --------------------------------------------------------
 
+        ordered_ind_tt = torch.tensor(
+            list(ind_tt.values()),
+            dtype=torch.float32,
+        )
+
+        target = torch.cat(
+            [
+                ordered_ind_tt,
+                torch.tensor([total_tt], dtype=torch.float32),
+            ]
+        )
+
+        joint_action = torch.tensor(
+            [actions_index[d.trip_id] for d in drivers],
+            dtype=torch.long,
+        )
+
+        # --------------------------------------------------------
+        # Add REAL experience to replay buffer
+        # --------------------------------------------------------
+
+        surrogate.add_experience(
+            joint_action,
+            target,
+        )
+
+        # ========================================================
+        # STANDARD Q-LEARNING UPDATE
+        # ========================================================
+        for driver_idx, driver in enumerate(drivers):
+            reward = ind_tt[driver.trip_id]
+
+            # Update Q-value
+            driver.q_values[driver_idx] = (1 - hyperparams["alpha"]) * driver.q_values[
+                driver_idx
+            ] + hyperparams["alpha"] * reward
+
+        # ========================================================
+        # DYNA-Q PLANNING STEPS USING SURROGATE
+        # ========================================================
+
+        surrogate.eval()
+
+        for _ in range(DYNA_STEPS):
+            simulated_joint_action = []
+
+            # ----------------------------------------------------
+            # Sample hypothetical action for every driver
+            # ----------------------------------------------------
+
+            for driver in drivers:
+                n_actions = len(driver.routes)
+
+                sampled_action = torch.randint(
+                    low=0,
+                    high=n_actions,
+                    size=(1,),
+                ).item()
+
+                simulated_joint_action.append(sampled_action)
+
+            simulated_joint_action = torch.tensor(
+                simulated_joint_action,
+                dtype=torch.long,
+                device=DEVICE,
+            )
+
+            # ----------------------------------------------------
+            # Predict outcome using surrogate
+            # ----------------------------------------------------
+
+            pred = surrogate.predict(
+                simulated_joint_action,
+            )
+
+            pred_ind_tt = pred["individual_tt"].squeeze(0)
+
+            # ----------------------------------------------------
+            # Q-learning update using MODELLED experience
+            # ----------------------------------------------------
+
+            for driver_idx, driver in enumerate(drivers):
+                reward = pred_ind_tt[driver_idx].item()
+
+                # Update Q-value
+                driver.q_values[driver_idx] = (
+                    1 - hyperparams["alpha"]
+                ) * driver.q_values[driver_idx] + hyperparams["alpha"] * reward
+
+        # ========================================================
+        # PERIODIC ONLINE SURROGATE RETRAINING
+        # ========================================================
+
+        if i > 0 and i % SURROGATE_RETRAIN_FREQ == 0:
+            print(f"\n[Episode {i}] Retraining surrogate with replay buffer...")
+
+            surrogate.retrain(
+                epochs=SURROGATE_RETRAIN_EPOCHS,
+                batch_size=config.get("surrogate_batch_size", 32),
+                lr=config.get("surrogate_finetune_lr", 1e-4),
+            )
+
+        # ========================================================
         # Reduce epsilon
-        epsilon = max(0.01, epsilon * decay)
+        # ========================================================
 
-        # Log progress
-        ut.log_progress(i=i, episodes=config["episodes"], ttts=ttts)
+        epsilon = max(
+            0.01,
+            epsilon * decay,
+        )
 
+        # ========================================================
+        # Logging
+        # ========================================================
+
+        ut.log_progress(
+            i=i,
+            episodes=config["episodes"],
+            ttts=ttts,
+        )
+
+        # ========================================================
         # Update travel times
+        # ========================================================
+
         ut.update_average_travel_times(
-            drivers=drivers, weights=xml.parse_weights("data/weights.xml")
+            drivers=drivers,
+            weights=xml.parse_weights("data/weights.xml"),
         )
 
     # Save the plot and pickle file for TTT and emissions
     base_name = (
-        "compliance_rate_exp_replay" if config["compliance_rate"] else "exp_replay"
+        "compliance_rate_surrogate" if config["compliance_rate"] else "_surrogate"
     )
     ut.save_metric(
         ttts, labels_dict, base_name + "_ttt", "TTT [h]", total_budget, weights

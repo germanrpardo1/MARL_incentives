@@ -10,26 +10,17 @@ OUTPUT
 
 TOTAL OUTPUT DIM = 1101
 
-Important:
-  Agents may have different numbers of valid actions.
-
-Example:
-  agent 0 -> 5 actions
-  agent 1 -> 2 actions
-  agent 2 -> 4 actions
-
-We use:
-  - shared action embeddings
-  - agent embeddings
-  - MLP surrogate baseline
-
-This is intentionally SIMPLE but clean and scalable.
+Added:
+  - Dyna-friendly prediction helpers
+  - Online replay buffer
+  - Incremental retraining / fine-tuning
+  - Replay mixed with original dataset
 """
 
 import torch
 import torch.nn as nn
 from pathlib import Path
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, TensorDataset
 from marl_incentives import traveller as tr
 from marl_incentives.environment import Network
 
@@ -62,17 +53,16 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 # ACTION SPACE PER AGENT
 # ============================================================
 
-# Example:
-# each agent has between 2 and 5 valid actions
-#
-# Replace with your real values.
-
-agent_num_actions = torch.randint(low=2, high=6, size=(NUM_AGENTS,))
+agent_num_actions = torch.randint(
+    low=2,
+    high=6,
+    size=(NUM_AGENTS,),
+)
 
 
 class SimulatorDataset(Dataset):
     """
-    Replace synthetic target generation with:
+    Generate data for training the SUMO surrogate model:
         simulator(joint_action)
 
     X shape:
@@ -82,16 +72,26 @@ class SimulatorDataset(Dataset):
         [N, 1101]
     """
 
-    def __init__(self, drivers, network_env, num_samples=10):
+    def __init__(self, drivers, network_env, num_samples):
+        # Load data if already stored
         if LOAD_DATA and DATASET_PATH.exists():
             data = torch.load(DATASET_PATH)
 
             self.X = data["X"]
             self.Y = data["Y"]
 
+        # Generate and store data
         else:
-            self.X = self.generate_actions(drivers, num_samples)
-            self.Y = self.generate_targets(self.X, drivers, network_env)
+            self.X = self.generate_actions(
+                drivers,
+                num_samples,
+            )
+
+            self.Y = self.generate_targets(
+                self.X,
+                drivers,
+                network_env,
+            )
 
             torch.save(
                 {
@@ -103,12 +103,19 @@ class SimulatorDataset(Dataset):
 
     @staticmethod
     def generate_actions(drivers, num_samples):
-        actions = torch.zeros((num_samples, NUM_AGENTS), dtype=torch.long)
+        actions = torch.zeros(
+            (num_samples, NUM_AGENTS),
+            dtype=torch.long,
+        )
 
         for i, driver in enumerate(drivers):
             n_actions = len(driver.costs)
 
-            actions[:, i] = torch.randint(low=0, high=n_actions, size=(num_samples,))
+            actions[:, i] = torch.randint(
+                low=0,
+                high=n_actions,
+                size=(num_samples,),
+            )
 
         return actions
 
@@ -146,30 +153,20 @@ class SurrogateModel(nn.Module):
 
         # ----------------------------------------------------
         # Action embeddings
-        #
-        # Shared across all agents.
-        #
-        # action 0..4 -> embedding vector
         # ----------------------------------------------------
 
         self.action_embedding = nn.Embedding(
-            num_embeddings=MAX_ACTIONS, embedding_dim=EMBED_DIM
+            num_embeddings=MAX_ACTIONS,
+            embedding_dim=EMBED_DIM,
         )
 
         # ----------------------------------------------------
         # Agent embeddings
-        #
-        # Gives model identity information.
-        #
-        # Otherwise:
-        #   "agent 3 choosing action 2"
-        # and
-        #   "agent 700 choosing action 2"
-        # look identical.
         # ----------------------------------------------------
 
         self.agent_embedding = nn.Embedding(
-            num_embeddings=NUM_AGENTS, embedding_dim=EMBED_DIM
+            num_embeddings=NUM_AGENTS,
+            embedding_dim=EMBED_DIM,
         )
 
         input_dim = NUM_AGENTS * EMBED_DIM
@@ -183,81 +180,247 @@ class SurrogateModel(nn.Module):
         )
 
         # Precompute agent ids
-        self.register_buffer("agent_ids", torch.arange(NUM_AGENTS))
+        self.register_buffer(
+            "agent_ids",
+            torch.arange(NUM_AGENTS),
+        )
+
+        # ----------------------------------------------------
+        # Replay buffers for online retraining
+        # ----------------------------------------------------
+
+        self.base_X = None
+        self.base_Y = None
+
+        self.replay_X = []
+        self.replay_Y = []
 
     def forward(self, actions):
         """
         actions shape:
-            [batch_size, 1100]
+            [batch_size, NUM_AGENTS]
         """
 
         batch_size = actions.size(0)
 
         # ----------------------------------------------------
         # Action embeddings
-        #
-        # shape:
-        #   [batch, 1100, EMBED_DIM]
         # ----------------------------------------------------
 
         action_emb = self.action_embedding(actions)
 
         # ----------------------------------------------------
         # Agent embeddings
-        #
-        # shape:
-        #   [1100, EMBED_DIM]
         # ----------------------------------------------------
 
         agent_emb = self.agent_embedding(self.agent_ids)
 
-        # Expand to batch dimension
-        #
-        # shape:
-        #   [batch, 1100, EMBED_DIM]
-
         agent_emb = agent_emb.unsqueeze(0).expand(batch_size, -1, -1)
 
         # ----------------------------------------------------
-        # Combine information
+        # Combine
         # ----------------------------------------------------
 
         x = action_emb + agent_emb
 
         # Flatten
-        #
-        # shape:
-        #   [batch, 1100 * EMBED_DIM]
 
         x = x.reshape(batch_size, -1)
 
-        # Predict travel times
-        #
-        # output shape:
-        #   [batch, 1101]
-
         return self.mlp(x)
+
+    # ========================================================
+    # DYNA / MODEL-BASED RL HELPERS
+    # ========================================================
+
+    @torch.no_grad()
+    def predict(self, joint_action):
+        """
+        Convenience inference wrapper.
+        """
+        self.eval()
+
+        if joint_action.dim() == 1:
+            joint_action = joint_action.unsqueeze(0)
+
+        joint_action = joint_action.to(next(self.parameters()).device)
+
+        pred = self.forward(joint_action)
+
+        return {
+            "individual_tt": pred[:, :NUM_AGENTS],
+            "total_tt": pred[:, -1],
+            "raw": pred,
+        }
+
+    @torch.no_grad()
+    def predict_total(self, joint_action):
+        """
+        Predict total network travel time only.
+        """
+        out = self.predict(joint_action)
+
+        return out["total_tt"]
+
+    @torch.no_grad()
+    def predict_individual(self, joint_action):
+        """
+        Predict individual travel times only.
+        """
+        out = self.predict(joint_action)
+
+        return out["individual_tt"]
+
+    @torch.no_grad()
+    def evaluate_joint_action(self, joint_action):
+        """
+        Reward-style evaluator.
+
+        Higher reward = lower congestion.
+        """
+        return self.predict_total(joint_action)
+
+    # ========================================================
+    # ONLINE RETRAINING
+    # ========================================================
+
+    def set_base_dataset(self, X, Y):
+        """
+        Store original offline dataset.
+
+        Prevents catastrophic forgetting during retraining.
+        """
+
+        self.base_X = X.detach().cpu()
+        self.base_Y = Y.detach().cpu()
+
+    def add_experience(self, joint_action, target):
+        """
+        Add newly collected REAL simulator data.
+
+        Args:
+            joint_action:
+                [NUM_AGENTS]
+                or
+                [1, NUM_AGENTS]
+
+            target:
+                [OUTPUT_DIM]
+                or
+                [1, OUTPUT_DIM]
+        """
+
+        if joint_action.dim() == 2:
+            joint_action = joint_action.squeeze(0)
+
+        if target.dim() == 2:
+            target = target.squeeze(0)
+
+        self.replay_X.append(joint_action.detach().cpu())
+
+        self.replay_Y.append(target.detach().cpu())
+
+    def retrain(
+        self,
+        epochs=1,
+        batch_size=32,
+        lr=1e-4,
+    ):
+        """
+        Fine-tune surrogate on:
+            offline dataset + replay buffer
+
+        This DOES NOT retrain from scratch.
+        """
+
+        if self.base_X is None:
+            raise ValueError("Base dataset not set. Call model.set_base_dataset(X, Y)")
+
+        # ----------------------------------------------------
+        # Build combined dataset
+        # ----------------------------------------------------
+
+        X_parts = [self.base_X]
+        Y_parts = [self.base_Y]
+
+        if len(self.replay_X) > 0:
+            replay_X = torch.stack(self.replay_X)
+            replay_Y = torch.stack(self.replay_Y)
+
+            X_parts.append(replay_X)
+            Y_parts.append(replay_Y)
+
+        X = torch.cat(X_parts, dim=0)
+        Y = torch.cat(Y_parts, dim=0)
+
+        dataset = TensorDataset(X, Y)
+
+        loader = DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=True,
+        )
+
+        optimizer = torch.optim.Adam(
+            self.parameters(),
+            lr=lr,
+        )
+
+        mse = nn.MSELoss()
+
+        self.train()
+
+        for epoch in range(epochs):
+            total_loss = 0.0
+
+            for batch_X, batch_Y in loader:
+                batch_X = batch_X.to(DEVICE)
+                batch_Y = batch_Y.to(DEVICE)
+
+                pred = self.forward(batch_X)
+
+                pred_individual = pred[:, :NUM_AGENTS]
+                pred_total = pred[:, -1]
+
+                true_individual = batch_Y[:, :NUM_AGENTS]
+                true_total = batch_Y[:, -1]
+
+                loss_individual = mse(
+                    pred_individual,
+                    true_individual,
+                )
+
+                loss_total = mse(
+                    pred_total,
+                    true_total,
+                )
+
+                loss = loss_individual + 5.0 * loss_total
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+                total_loss += loss.item()
+
+            avg_loss = total_loss / len(loader)
+
+            print(f"[Retrain] Epoch {epoch + 1:02d} | Loss = {avg_loss:.6f}")
 
 
 def main():
-    # Unpack configuration file
-    # Store all the paths
+    # ========================================================
+    # PATHS
+    # ========================================================
+
     paths_dict = {
-        # Path of output.rou.alt file
         "output_rou_alt_path": "data/output.rou.alt.xml",
-        # Path of output.rou file
         "routes_file_path": "data/output.rou.xml",
-        # Path for edge data frequency config
         "edge_data_path": "data/edge_data.add.xml",
-        # Path for SUMO log
         "log_path": "data/log.xml",
-        # Path to write emissions data
         "emissions_path": "data/fcd.xml",
-        # Path to emissions data per vehicle
         "emissions_per_vehicle_path": "data/emissions_per_vehicle.txt",
-        # Path to stats data after simulation
         "stats_path": "data/stats.xml",
-        # Path to tripinfo file
         "trip_info_path": "data/tripinfo.xml",
         "edges_weights_path": "weights.xml",
     }
@@ -267,14 +430,17 @@ def main():
         "network_path": "data/kamppi.net.xml",
         "routes_path": "data/output.rou.xml",
     }
-    # Initialise all drivers
+
+    # ========================================================
+    # DRIVERS + NETWORK
+    # ========================================================
+
     drivers = tr.initialise_drivers(
         actions_file_path=paths_dict["output_rou_alt_path"],
         incentives_mode=True,
         strategy="logit",
     )
 
-    # Instantiate network object
     network_env = Network(
         paths_dict=paths_dict,
         sumo_params=sumo_params,
@@ -282,27 +448,45 @@ def main():
         buffer_capacity=64,
         batch_size=32,
     )
-    # ============================================================
+
+    # ========================================================
     # DATA
-    # ============================================================
+    # ========================================================
 
-    dataset = SimulatorDataset(drivers, network_env, num_samples=NUM_SAMPLES)
+    dataset = SimulatorDataset(
+        drivers,
+        network_env,
+        num_samples=NUM_SAMPLES,
+    )
 
-    loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
+    loader = DataLoader(
+        dataset,
+        batch_size=BATCH_SIZE,
+        shuffle=True,
+    )
 
-    # ============================================================
-    # MODEL SETUP
-    # ============================================================
+    # ========================================================
+    # MODEL
+    # ========================================================
 
     model = SurrogateModel().to(DEVICE)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    # Store offline dataset
+    model.set_base_dataset(
+        dataset.X,
+        dataset.Y,
+    )
+
+    optimizer = torch.optim.Adam(
+        model.parameters(),
+        lr=LEARNING_RATE,
+    )
 
     mse = nn.MSELoss()
 
-    # ============================================================
-    # TRAINING
-    # ============================================================
+    # ========================================================
+    # INITIAL TRAINING
+    # ========================================================
 
     for epoch in range(EPOCHS):
         model.train()
@@ -315,21 +499,22 @@ def main():
 
             pred = model(X)
 
-            # ----------------------------------------------------
-            # Separate losses
-            # ----------------------------------------------------
-
             pred_individual = pred[:, :NUM_AGENTS]
             pred_total = pred[:, -1]
 
             true_individual = Y[:, :NUM_AGENTS]
             true_total = Y[:, -1]
 
-            loss_individual = mse(pred_individual, true_individual)
+            loss_individual = mse(
+                pred_individual,
+                true_individual,
+            )
 
-            loss_total = mse(pred_total, true_total)
+            loss_total = mse(
+                pred_total,
+                true_total,
+            )
 
-            # Weight total network prediction more
             loss = loss_individual + 5.0 * loss_total
 
             optimizer.zero_grad()
@@ -342,34 +527,67 @@ def main():
 
         print(f"Epoch {epoch + 1:02d} | Loss = {avg_loss:.6f}")
 
-    # ============================================================
+    # ========================================================
     # INFERENCE
-    # ============================================================
+    # ========================================================
 
     model.eval()
 
     with torch.no_grad():
-        # Build one VALID joint action
-
-        joint_action = torch.zeros((1, NUM_AGENTS), dtype=torch.long)
+        joint_action = torch.zeros(
+            (1, NUM_AGENTS),
+            dtype=torch.long,
+        )
 
         for agent_id in range(NUM_AGENTS):
             n_actions = agent_num_actions[agent_id].item()
 
-            joint_action[0, agent_id] = torch.randint(low=0, high=n_actions, size=(1,))
+            joint_action[0, agent_id] = torch.randint(
+                low=0,
+                high=n_actions,
+                size=(1,),
+            )
 
         joint_action = joint_action.to(DEVICE)
 
-        prediction = model(joint_action)
-
-        individual_tt = prediction[0, :NUM_AGENTS]
-        total_tt = prediction[0, -1]
+        result = model.predict(joint_action)
 
         print("\nPredicted total network travel time:")
-        print(total_tt.item())
+
+        print(result["total_tt"].item())
 
         print("\nFirst 10 individual predictions:")
-        print(individual_tt[:10])
+
+        print(result["individual_tt"][0, :10])
+
+    # ========================================================
+    # ONLINE DYNA RETRAINING EXAMPLE
+    # ========================================================
+
+    print("\nAdding new real experience...")
+
+    new_joint_action = torch.randint(
+        low=0,
+        high=MAX_ACTIONS,
+        size=(NUM_AGENTS,),
+    )
+
+    # Example:
+    # replace with REAL simulator output
+
+    new_target = torch.randn(OUTPUT_DIM)
+
+    model.add_experience(
+        new_joint_action,
+        new_target,
+    )
+
+    # Fine-tune existing model
+    model.retrain(
+        epochs=2,
+        batch_size=32,
+        lr=1e-4,
+    )
 
 
 if __name__ == "__main__":
