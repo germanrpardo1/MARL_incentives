@@ -38,6 +38,7 @@ from marl_incentives.environment import Network
 
 NUM_AGENTS = 1100
 MAX_ACTIONS = 5
+NUM_SAMPLES = 10
 
 INDIVIDUAL_OUTPUTS = NUM_AGENTS
 GLOBAL_OUTPUTS = 1
@@ -98,24 +99,27 @@ class SimulatorDataset(Dataset):
         # FAKE SIMULATOR
         # Replace this block with your simulator outputs
         # ----------------------------------------------------
-        edges = {}
-        for i, driver in enumerate(drivers):
-            edges[driver.trip_id] = []
-            for j in range(len(X)):
-                action_idx = X[j, i]
-                edges[driver.trip_id].append(driver.routes[action_idx][1])
+        outputs = []
 
-        for j in range(len(X)):
-            all_edges = {}
-            for driver in drivers:
-                all_edges[driver.trip_id] = edges[driver.trip_id][j]
+        for row in X:
+            routes_edges = {
+                driver.trip_id: driver.routes[row[i]][1]
+                for i, driver in enumerate(drivers)
+            }
 
-            total_tt, ind_tt, ind_em, total_em = network_env.step(
-                routes_edges=all_edges,
-            )
+            outputs.append(network_env.step(routes_edges=routes_edges))
 
-        # TODO(German): Here need to put ALL the ind_tt and total_tt from all rows.
-        Y = torch.cat([ind_tt, total_tt], dim=1)
+        total_tt_list, ind_tt_list, ind_em_list, total_em_list = zip(*outputs)
+
+        Y = torch.cat(
+            [
+                torch.stack(
+                    [torch.tensor(list(ind_tt.values())) for ind_tt in ind_tt_list]
+                ),
+                torch.tensor(total_tt_list).unsqueeze(1),
+            ],
+            dim=1,
+        )
 
         return Y
 
@@ -272,7 +276,7 @@ def main():
     # DATA
     # ============================================================
 
-    dataset = SimulatorDataset(drivers, network_env, num_samples=10)
+    dataset = SimulatorDataset(drivers, network_env, num_samples=NUM_SAMPLES)
 
     loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
