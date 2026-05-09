@@ -83,7 +83,7 @@ def pre_train(surrogate: SurrogateModel, config, DEVICE, drivers, network_env):
     return surrogate
 
 
-def main(config, total_budget: int) -> None:
+def main(config: dict, total_budget: int) -> None:
     """
     Run the MARL algorithm with or without incentives with experience replay.
 
@@ -134,7 +134,7 @@ def main(config, total_budget: int) -> None:
     # Define surrogate model for SUMO
     surrogate = SurrogateModel().to(DEVICE)
 
-    # Pre train surrogate model
+    # Pretrain surrogate model
     surrogate = pre_train(surrogate, config, DEVICE, drivers, network_env)
 
     epsilon = hyperparams["epsilon"]
@@ -144,6 +144,7 @@ def main(config, total_budget: int) -> None:
     # START RL TRAINING
     # ============================================================
     for i in range(config["episodes"]):
+        print("Start training")
         # Get action from policy for every driver with incentives mode
         if config["incentives_mode"]:
             routes_edges, actions_index, current_used_budget, acceptance_rate = (
@@ -185,7 +186,7 @@ def main(config, total_budget: int) -> None:
         # --------------------------------------------------------
 
         ordered_ind_tt = torch.tensor(
-            list(ind_tt.values()),
+            [ind_tt[d.trip_id] for d in drivers],
             dtype=torch.float32,
         )
 
@@ -214,11 +215,12 @@ def main(config, total_budget: int) -> None:
         # STANDARD Q-LEARNING UPDATE
         # ========================================================
         for driver_idx, driver in enumerate(drivers):
+            idx = actions_index[driver.trip_id]
             reward = ind_tt[driver.trip_id]
 
             # Update Q-value
-            driver.q_values[driver_idx] = (1 - hyperparams["alpha"]) * driver.q_values[
-                driver_idx
+            driver.q_values[idx] = (1 - hyperparams["alpha"]) * driver.q_values[
+                idx
             ] + hyperparams["alpha"] * reward
 
         # ========================================================
@@ -266,12 +268,13 @@ def main(config, total_budget: int) -> None:
             # ----------------------------------------------------
 
             for driver_idx, driver in enumerate(drivers):
+                idx = simulated_joint_action[driver_idx].item()
                 reward = pred_ind_tt[driver_idx].item()
 
                 # Update Q-value
-                driver.q_values[driver_idx] = (
-                    1 - hyperparams["alpha"]
-                ) * driver.q_values[driver_idx] + hyperparams["alpha"] * reward
+                driver.q_values[idx] = (1 - hyperparams["alpha"]) * driver.q_values[
+                    idx
+                ] + hyperparams["alpha"] * reward
 
         # ========================================================
         # PERIODIC ONLINE SURROGATE RETRAINING
