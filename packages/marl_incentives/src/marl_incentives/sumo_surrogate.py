@@ -28,6 +28,7 @@ This is intentionally SIMPLE but clean and scalable.
 
 import torch
 import torch.nn as nn
+from pathlib import Path
 from torch.utils.data import DataLoader, Dataset
 from marl_incentives import traveller as tr
 from marl_incentives.environment import Network
@@ -35,6 +36,9 @@ from marl_incentives.environment import Network
 # ============================================================
 # CONFIG
 # ============================================================
+
+DATASET_PATH = Path("dataset.pt")
+LOAD_DATA = False
 
 NUM_AGENTS = 1100
 MAX_ACTIONS = 5
@@ -79,8 +83,23 @@ class SimulatorDataset(Dataset):
     """
 
     def __init__(self, drivers, network_env, num_samples=10):
-        self.X = self.generate_actions(drivers, num_samples)
-        self.Y = self.generate_targets(self.X, drivers, network_env)
+        if LOAD_DATA and DATASET_PATH.exists():
+            data = torch.load(DATASET_PATH)
+
+            self.X = data["X"]
+            self.Y = data["Y"]
+
+        else:
+            self.X = self.generate_actions(drivers, num_samples)
+            self.Y = self.generate_targets(self.X, drivers, network_env)
+
+            torch.save(
+                {
+                    "X": self.X,
+                    "Y": self.Y,
+                },
+                DATASET_PATH,
+            )
 
     @staticmethod
     def generate_actions(drivers, num_samples):
@@ -95,11 +114,7 @@ class SimulatorDataset(Dataset):
 
     @staticmethod
     def generate_targets(X, drivers, network_env):
-        # ----------------------------------------------------
-        # FAKE SIMULATOR
-        # Replace this block with your simulator outputs
-        # ----------------------------------------------------
-        outputs = []
+        targets = []
 
         for row in X:
             routes_edges = {
@@ -107,21 +122,16 @@ class SimulatorDataset(Dataset):
                 for i, driver in enumerate(drivers)
             }
 
-            outputs.append(network_env.step(routes_edges=routes_edges))
+            total_tt, ind_tt, _, _ = network_env.step(routes_edges=routes_edges)
 
-        total_tt_list, ind_tt_list, ind_em_list, total_em_list = zip(*outputs)
+            y = torch.tensor(
+                list(ind_tt.values()) + [total_tt],
+                dtype=torch.float32,
+            )
 
-        Y = torch.cat(
-            [
-                torch.stack(
-                    [torch.tensor(list(ind_tt.values())) for ind_tt in ind_tt_list]
-                ),
-                torch.tensor(total_tt_list).unsqueeze(1),
-            ],
-            dim=1,
-        )
+            targets.append(y)
 
-        return Y
+        return torch.stack(targets)
 
     def __len__(self):
         return len(self.X)
