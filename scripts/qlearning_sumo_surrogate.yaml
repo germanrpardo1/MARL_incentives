@@ -29,9 +29,6 @@ alpha: 0.01
 # Total available budget for incentives or policies (can be used as a constraint)
 total_budget:
   - 100000000
-  - 30000
-  - 50000
-  - 100000000
 # Select route selection strategy
 strategy: "logit"
 # Store all the paths

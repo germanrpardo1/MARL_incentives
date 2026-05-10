@@ -144,7 +144,6 @@ def main(config: dict, total_budget: int) -> None:
     # START RL TRAINING
     # ============================================================
     for i in range(config["episodes"]):
-        print("Start training")
         # Get action from policy for every driver with incentives mode
         if config["incentives_mode"]:
             routes_edges, actions_index, current_used_budget, acceptance_rate = (
@@ -352,7 +351,7 @@ def main(config: dict, total_budget: int) -> None:
 
 if __name__ == "__main__":
     # Load config
-    config_file = ut.load_config(path="scripts/qlearning_no_state_exp_replay.yaml")
+    config_file = ut.load_config(path="scripts/qlearning_sumo_surrogate.yaml")
 
     # Loop for different budgets
     for tot_budget in config_file["total_budget"]:
