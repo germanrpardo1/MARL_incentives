@@ -31,7 +31,7 @@ from marl_incentives.environment import Network
 # ============================================================
 
 DATASET_PATH = Path("dataset.pt")
-LOAD_DATA = True
+LOAD_DATA = False
 
 NUM_AGENTS = 1100
 MAX_ACTIONS = 5
@@ -79,8 +79,8 @@ class SimulatorDataset(Dataset):
         if LOAD_DATA and DATASET_PATH.exists():
             data = torch.load(DATASET_PATH)
 
-            self.X = torch.stack(data["X"])
-            self.Y = torch.stack(data["Y"]).float()
+            self.X = data["X"]
+            self.Y = data["Y"].float()
 
         # Generate and store data
         else:
