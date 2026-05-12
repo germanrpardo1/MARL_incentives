@@ -79,7 +79,7 @@ class SimulatorDataset(Dataset):
         if LOAD_DATA and DATASET_PATH.exists():
             data = torch.load(DATASET_PATH)
 
-            self.X = torch.stack(data["X"]).float()
+            self.X = torch.stack(data["X"])
             self.Y = torch.stack(data["Y"]).float()
 
         # Generate and store data
