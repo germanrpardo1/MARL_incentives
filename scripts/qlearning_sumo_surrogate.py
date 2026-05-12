@@ -5,21 +5,21 @@ It uses experience replay to accelerate learning, and it does not have
 a state variable.
 """
 
+import torch
 from marl_incentives import traveller as tr
 from marl_incentives import utils as ut
 from marl_incentives import xml_manipulation as xml
 from marl_incentives.environment import Network
-from sumo_surrogate import SurrogateModel, SimulatorDataset
-import torch
+from sumo_surrogate import SimulatorDataset, SurrogateModel
 
 
-def pre_train(surrogate: SurrogateModel, config, DEVICE, drivers, network_env):
-    surrogate_dataset = SimulatorDataset(
-        drivers=drivers,
-        network_env=network_env,
-        num_samples=config.get("surrogate_dataset_size", 10),
-    )
-
+def pre_train(
+    surrogate: SurrogateModel,
+    surrogate_dataset: SimulatorDataset,
+    config,
+    DEVICE,
+    drivers,
+):
     surrogate.set_base_dataset(
         surrogate_dataset.X,
         surrogate_dataset.Y,
@@ -131,11 +131,17 @@ def main(config: dict, total_budget: int) -> None:
         batch_size=config["batch_size"],
     )
 
+    surrogate_dataset = SimulatorDataset(
+        drivers=drivers,
+        network_env=network_env,
+        num_samples=config.get("surrogate_dataset_size", 10),
+    )
+
     # Define surrogate model for SUMO
     surrogate = SurrogateModel().to(DEVICE)
 
     # Pretrain surrogate model
-    surrogate = pre_train(surrogate, config, DEVICE, drivers, network_env)
+    surrogate = pre_train(surrogate, surrogate_dataset, config, DEVICE, drivers)
 
     epsilon = hyperparams["epsilon"]
     decay = hyperparams["decay"]
@@ -315,6 +321,9 @@ def main(config: dict, total_budget: int) -> None:
             drivers=drivers,
             weights=xml.parse_weights("data/weights.xml"),
         )
+
+    surrogate_dataset.save_dataset()
+    torch.save(surrogate.state_dict(), "model.pth")
 
     # Save the plot and pickle file for TTT and emissions
     base_name = (

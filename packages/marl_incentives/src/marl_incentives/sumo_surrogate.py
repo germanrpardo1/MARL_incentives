@@ -17,10 +17,12 @@ Added:
   - Replay mixed with original dataset
 """
 
+from pathlib import Path
+
 import torch
 import torch.nn as nn
-from pathlib import Path
 from torch.utils.data import DataLoader, Dataset, TensorDataset
+
 from marl_incentives import traveller as tr
 from marl_incentives.environment import Network
 
@@ -93,13 +95,16 @@ class SimulatorDataset(Dataset):
                 network_env,
             )
 
-            torch.save(
-                {
-                    "X": self.X,
-                    "Y": self.Y,
-                },
-                DATASET_PATH,
-            )
+            self.save_dataset()
+
+    def save_dataset(self):
+        torch.save(
+            {
+                "X": self.X,
+                "Y": self.Y,
+            },
+            DATASET_PATH,
+        )
 
     @staticmethod
     def generate_actions(drivers, num_samples):
