@@ -31,7 +31,7 @@ from marl_incentives.environment import Network
 # ============================================================
 
 DATASET_PATH = Path("dataset.pt")
-LOAD_DATA = False
+LOAD_DATA = True
 
 NUM_AGENTS = 1100
 MAX_ACTIONS = 5
@@ -79,8 +79,8 @@ class SimulatorDataset(Dataset):
         if LOAD_DATA and DATASET_PATH.exists():
             data = torch.load(DATASET_PATH)
 
-            self.X = data["X"]
-            self.Y = data["Y"]
+            self.X = torch.stack(data["X"]).float()
+            self.Y = torch.stack(data["Y"]).float()
 
         # Generate and store data
         else:
@@ -324,6 +324,15 @@ class SurrogateModel(nn.Module):
         self.replay_X.append(joint_action.detach().cpu())
 
         self.replay_Y.append(target.detach().cpu())
+
+    def save_dataset(self):
+        torch.save(
+            {
+                "X": self.replay_X,
+                "Y": self.replay_Y,
+            },
+            DATASET_PATH,
+        )
 
     def retrain(
         self,

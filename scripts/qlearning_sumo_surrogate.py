@@ -20,11 +20,6 @@ def pre_train(
     DEVICE,
     drivers,
 ):
-    surrogate.set_base_dataset(
-        surrogate_dataset.X,
-        surrogate_dataset.Y,
-    )
-
     train_loader = torch.utils.data.DataLoader(
         surrogate_dataset,
         batch_size=config.get("surrogate_batch_size", 32),
@@ -139,6 +134,14 @@ def main(config: dict, total_budget: int) -> None:
 
     # Define surrogate model for SUMO
     surrogate = SurrogateModel().to(DEVICE)
+
+    surrogate.set_base_dataset(
+        surrogate_dataset.X,
+        surrogate_dataset.Y,
+    )
+
+    surrogate.load_state_dict(torch.load("model.pth"))
+    surrogate.eval()  # important for inference
 
     # Pretrain surrogate model
     surrogate = pre_train(surrogate, surrogate_dataset, config, DEVICE, drivers)
