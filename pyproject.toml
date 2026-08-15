@@ -9,12 +9,14 @@ authors = [
 requires-python = ">=3.13"
 
 dependencies = [
+    "gurobipy>=13.0.2",
     "hatchling>=1.27.0",
     "lxml>=6.0.0",
     "matplotlib>=3.10.3",
     "myst-parser>=4.0.1",
     "notebook>=7.4.7",
     "numpy>=2.3.2",
+    "pandas>=3.0.3",
     "pre-commit>=4.2.0",
     "setuptools>=61.0",
     "sphinx>=8.2.3",

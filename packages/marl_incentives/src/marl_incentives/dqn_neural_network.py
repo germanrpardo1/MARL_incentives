@@ -1,6 +1,6 @@
 """Module for the DQN neural network."""
 
-import torch.nn as nn
+from torch import nn
 
 
 class DQN(nn.Module):

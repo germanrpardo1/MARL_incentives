@@ -20,7 +20,7 @@ Added:
 from pathlib import Path
 
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.utils.data import DataLoader, Dataset, TensorDataset
 
 from marl_incentives import traveller as tr

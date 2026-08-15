@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 
 import numpy as np
 import torch
-import torch.optim as optim
+from torch import optim
 
 from marl_incentives import utils as ut
 from marl_incentives.dqn_neural_network import DQN
@@ -52,7 +52,7 @@ class Driver:
                 self.state_action_counts = np.zeros((2, len(self.costs) + 1))
 
             elif incentives_mode and not state_variable:
-                self.q_values = np.zeros((len(self.costs) + 1))
+                self.q_values = np.zeros(len(self.costs) + 1)
                 self.action_counts = np.zeros(len(self.costs) + 1)
 
             elif not incentives_mode and state_variable:
