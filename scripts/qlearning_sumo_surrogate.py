@@ -178,7 +178,7 @@ def main(config: dict, total_budget: int) -> None:
         # Execute REAL simulator step
         # --------------------------------------------------------
 
-        total_tt, ind_tt, ind_em, total_em = network_env.step(
+        total_tt, ind_tt, _, total_em = network_env.step(
             routes_edges=routes_edges,
         )
 
