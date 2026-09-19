@@ -44,21 +44,35 @@ class ReplayBuffer:
         reward,
         weights: dict,
         alpha: float | None,
+        individual_speeds: dict | None = None,
+        reward_mode: str = "weighted",
     ):
         """complete."""
-        total_tt, ind_tt, ind_em, total_em = reward
+        total_tt, ind_tt, ind_em, total_em, *extra = reward
+        if individual_speeds is None and extra:
+            individual_speeds = extra[0]
         for driver in drivers:
             idx = action_index[driver.trip_id]
             # Update action counts
             driver.action_counts[idx] += 1
             # Calculate alpha based on action counts
-            if not alpha:
-                alpha = 1 / driver.action_counts[idx]
+            learning_rate = alpha or 1 / driver.action_counts[idx]
 
             # Compute reward
-            reward = driver.compute_reward(ind_tt, ind_em, total_tt, total_em, weights)
+            observed_reward = driver.compute_reward(
+                ind_tt,
+                ind_em,
+                total_tt,
+                total_em,
+                weights,
+                individual_speeds,
+                reward_mode,
+            )
             # Update Q-value
-            driver.q_values[idx] = (1 - alpha) * driver.q_values[idx] + alpha * reward
+            driver.q_values[idx] = (
+                (1 - learning_rate) * driver.q_values[idx]
+                + learning_rate * observed_reward
+            )
 
     def __len__(self) -> int:
         """Get the size of the replay buffer."""
@@ -105,24 +119,42 @@ class StateReplayBuffer:
         reward,
         weights: dict,
         alpha: float | None,
+        individual_speeds: dict | None = None,
+        reward_mode: str = "weighted",
     ):
         """complete."""
-        total_tt, ind_tt, ind_em, total_em = reward
-        for driver in drivers:
+        total_tt, ind_tt, ind_em, total_em, *extra = reward
+        if individual_speeds is None and extra:
+            individual_speeds = extra[0]
+        for driver_index, driver in enumerate(drivers):
             idx = action_index[driver.trip_id]
-            index_state = state_index[driver.trip_id]
+            index_state = (
+                state_index[driver.trip_id]
+                if isinstance(state_index, dict)
+                else state_index[driver_index]
+            )
             # Update state-action pairs counts
             driver.state_action_counts[index_state][idx] += 1
             # Calculate alpha based on state-action counts
-            if not alpha:
-                alpha = 1 / driver.state_action_counts[index_state][idx]
+            learning_rate = (
+                alpha or 1 / driver.state_action_counts[index_state][idx]
+            )
 
             # Compute reward
-            reward = driver.compute_reward(ind_tt, ind_em, total_tt, total_em, weights)
+            observed_reward = driver.compute_reward(
+                ind_tt,
+                ind_em,
+                total_tt,
+                total_em,
+                weights,
+                individual_speeds,
+                reward_mode,
+            )
             # Update Q-value
-            driver.q_values[index_state][idx] = (1 - alpha) * driver.q_values[
-                index_state
-            ][idx] + alpha * reward
+            driver.q_values[index_state][idx] = (
+                (1 - learning_rate) * driver.q_values[index_state][idx]
+                + learning_rate * observed_reward
+            )
 
     def __len__(self) -> int:
         """Get the size of the replay buffer."""

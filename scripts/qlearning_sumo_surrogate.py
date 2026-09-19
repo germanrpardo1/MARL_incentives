@@ -5,12 +5,14 @@ It uses experience replay to accelerate learning, and it does not have
 a state variable.
 """
 
+from pathlib import Path
+
 import torch
 from marl_incentives import traveller as tr
 from marl_incentives import utils as ut
 from marl_incentives import xml_manipulation as xml
 from marl_incentives.environment import Network
-from sumo_surrogate import SimulatorDataset, SurrogateModel
+from marl_incentives.sumo_surrogate import SimulatorDataset, SurrogateModel
 
 
 def pre_train(
@@ -85,6 +87,11 @@ def main(config: dict, total_budget: int) -> None:
     :param config: Configuration dictionary.
     :param total_budget: Total budget.
     """
+    experiment = "qlearning_sumo_surrogate"
+    config = ut.prepare_run_config(config, experiment, total_budget)
+    ut.set_global_seed(config.get("seed", 42))
+    ut.save_run_metadata(config, experiment, total_budget)
+
     # Unpack configuration file
     weights, hyperparams, paths_dict, edge_data_frequency, sumo_params = (
         ut.unpack_config(config)
@@ -130,21 +137,37 @@ def main(config: dict, total_budget: int) -> None:
         drivers=drivers,
         network_env=network_env,
         num_samples=config.get("surrogate_dataset_size", 10),
+        dataset_path=Path(config["run_dir"])
+        / config.get("surrogate_dataset_path", "dataset.pt"),
+        load_data=config.get("load_surrogate_dataset", True),
     )
 
     # Define surrogate model for SUMO
-    surrogate = SurrogateModel().to(DEVICE)
+    surrogate = SurrogateModel(
+        num_agents=len(drivers),
+        max_actions=max(len(driver.routes) for driver in drivers),
+        embed_dim=config.get("surrogate_embed_dim", 16),
+        hidden_dim=config.get("surrogate_hidden_dim", 2048),
+    ).to(DEVICE)
 
     surrogate.set_base_dataset(
         surrogate_dataset.X,
         surrogate_dataset.Y,
     )
 
-    surrogate.load_state_dict(torch.load("model.pth"))
-    surrogate.eval()  # important for inference
-
-    # Pretrain surrogate model
-    surrogate = pre_train(surrogate, surrogate_dataset, config, DEVICE, drivers)
+    checkpoint_path = Path(config["run_dir"]) / config.get(
+        "surrogate_checkpoint_path", "model.pth"
+    )
+    if checkpoint_path.exists():
+        surrogate.load_state_dict(
+            torch.load(checkpoint_path, map_location=DEVICE, weights_only=True)
+        )
+        print(f"Loaded surrogate checkpoint: {checkpoint_path}")
+    else:
+        surrogate = pre_train(surrogate, surrogate_dataset, config, DEVICE, drivers)
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(surrogate.state_dict(), checkpoint_path)
+    surrogate.eval()
 
     epsilon = hyperparams["epsilon"]
     decay = hyperparams["decay"]
@@ -205,10 +228,17 @@ def main(config: dict, total_budget: int) -> None:
             ]
         )
 
-        joint_action = torch.tensor(
-            [actions_index[d.trip_id] for d in drivers],
-            dtype=torch.long,
-        )
+        selected_routes = []
+        for driver in drivers:
+            selected_edges = routes_edges[driver.trip_id]
+            selected_routes.append(
+                next(
+                    route_index
+                    for route_index, route in driver.routes
+                    if route == selected_edges
+                )
+            )
+        joint_action = torch.tensor(selected_routes, dtype=torch.long)
 
         # --------------------------------------------------------
         # Add REAL experience to replay buffer
@@ -322,11 +352,11 @@ def main(config: dict, total_budget: int) -> None:
 
         ut.update_average_travel_times(
             drivers=drivers,
-            weights=xml.parse_weights("data/weights.xml"),
+            weights=xml.parse_weights(paths_dict["edges_weights_path"]),
         )
 
     surrogate_dataset.save_dataset()
-    torch.save(surrogate.state_dict(), "model.pth")
+    torch.save(surrogate.state_dict(), checkpoint_path)
 
     # Save the plot and pickle file for TTT and emissions
     base_name = (

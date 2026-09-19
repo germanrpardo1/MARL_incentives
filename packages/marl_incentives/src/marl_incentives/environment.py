@@ -78,7 +78,14 @@ class Network:
             self.paths_dict["edges_weights_path"],
             self.edge_data_frequency,
         )
-        xmlm.write_sumo_config(**self.sumo_params)
+        xmlm.write_sumo_config(
+            **self.sumo_params,
+            edge_data_path=self.paths_dict["edge_data_path"],
+            trip_info_path=self.paths_dict["trip_info_path"],
+            log_path=self.paths_dict["log_path"],
+            stats_path=self.paths_dict["stats_path"],
+            emissions_path=self.paths_dict["emissions_path"],
+        )
 
         # Run SUMO simulation
         self.run_simulation()
@@ -89,8 +96,8 @@ class Network:
             self.paths_dict["trip_info_path"]
         )
         # Get emissions
-        total_emissions, individual_emissions = em.co2_main(
-            self.paths_dict["emissions_path"]
+        total_emissions, individual_emissions, self.individual_speeds = em.co2_main(
+            self.paths_dict["emissions_path"], include_speeds=True
         )
 
         return total_tt, individual_tt, individual_emissions, total_emissions / 1000

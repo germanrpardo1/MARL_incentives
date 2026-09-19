@@ -13,6 +13,33 @@ from marl_incentives.dqn_neural_network import DQN
 _rng = np.random.default_rng()
 
 
+def set_random_seed(seed: int) -> None:
+    """Reset the module-level generator used by all traveller policies."""
+    global _rng
+    _rng = np.random.default_rng(seed)
+
+
+def compute_speed_reward(
+    trip_id: str, individual_speeds: dict[str, float], reward_mode: str
+) -> float:
+    """Compute either of the speed rewards defined in the paper."""
+    if not individual_speeds:
+        raise ValueError(f"{reward_mode} reward requires individual speeds")
+
+    speeds = np.asarray(list(individual_speeds.values()), dtype=float)
+    speed = individual_speeds[trip_id]
+    if reward_mode == "speed_relative":
+        return speed - float(np.mean(speeds))
+    if reward_mode == "speed_percentile":
+        lower, upper = np.percentile(speeds, [25, 75])
+        if speed >= upper:
+            return 5.0
+        if speed <= lower:
+            return -1.0
+        return 1.0
+    raise ValueError(f"Unknown speed reward mode: {reward_mode}")
+
+
 class Driver:
     """Class that represents a single driver."""
 
@@ -164,10 +191,10 @@ class Driver:
     def thompson_sampling(self) -> tuple[list, int, int, float]:
         """pass."""
         # Sample variances from Inverse-Gamma
-        sigma2 = 1.0 / np.random.gamma(self.alphas, 1.0 / self.betas)
+        sigma2 = 1.0 / _rng.gamma(self.alphas, 1.0 / self.betas)
 
         # Sample means conditioned on variances
-        samples_travel_times = np.random.normal(
+        samples_travel_times = _rng.normal(
             loc=self.estimated_means, scale=np.sqrt(sigma2 / self.kappas)
         )
 
@@ -266,6 +293,8 @@ class Driver:
         total_tt: float,
         total_em: float,
         weights: dict,
+        individual_speeds: dict | None = None,
+        reward_mode: str = "weighted",
     ) -> float:
         """
         Compute the multi-objective reward.
@@ -277,6 +306,16 @@ class Driver:
         :param weights: Weight of incentives.
         :return: Multi-objective reward.
         """
+        if reward_mode in {"speed_relative", "speed_percentile"}:
+            # Q-values are minimised throughout this codebase. Store the negative
+            # paper reward so minimisation is equivalent to reward maximisation.
+            return -compute_speed_reward(
+                self.trip_id, individual_speeds, reward_mode
+            )
+
+        if reward_mode != "weighted":
+            raise ValueError(f"Unknown reward mode: {reward_mode}")
+
         return (
             weights["individual_tt"] * ind_tt[self.trip_id]
             + weights["ttt"] * total_tt

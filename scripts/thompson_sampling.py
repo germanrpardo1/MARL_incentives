@@ -16,6 +16,11 @@ def main(config, total_budget: int) -> None:
     :param config: Configuration dictionary.
     :param total_budget: Total budget.
     """
+    experiment = "thompson_sampling"
+    config = ut.prepare_run_config(config, experiment, total_budget)
+    ut.set_global_seed(config.get("seed", 42))
+    ut.save_run_metadata(config, experiment, total_budget)
+
     # Weights of the objective function
     weights = {
         "ttt": config["TTT_weight"],
@@ -78,7 +83,15 @@ def main(config, total_budget: int) -> None:
         for driver in drivers:
             idx = actions_index[driver.trip_id]
 
-            reward = driver.compute_reward(ind_tt, ind_em, total_tt, total_em, weights)
+            reward = driver.compute_reward(
+                ind_tt,
+                ind_em,
+                total_tt,
+                total_em,
+                weights,
+                network_env.individual_speeds,
+                config.get("reward_mode", "weighted"),
+            )
 
             # Shorthands
             mu = driver.estimated_means[idx]
@@ -102,7 +115,8 @@ def main(config, total_budget: int) -> None:
 
         # Update travel times
         ut.update_average_travel_times(
-            drivers=drivers, weights=xml.parse_weights("data/weights.xml")
+            drivers=drivers,
+            weights=xml.parse_weights(paths_dict["edges_weights_path"]),
         )
 
     # Save the plot and pickle file for TTT and emissions

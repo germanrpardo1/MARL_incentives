@@ -1,0 +1,2 @@
+extends: "qlearning_no_state_exp_replay.yaml"
+reward_mode: "speed_percentile"

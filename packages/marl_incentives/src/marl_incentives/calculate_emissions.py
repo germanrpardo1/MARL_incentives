@@ -15,7 +15,7 @@ from lxml import etree
 from marl_incentives.co2modeler_v1 import co2modeler  # Import the CO2 modeler
 
 
-def co2_main(path, vehicle_type="light_passenger", fuel="gasoline"):
+def co2_main(path, vehicle_type="light_passenger", fuel="gasoline", include_speeds=False):
     """
     Parse an XML file and calculate total and per-vehicle CO2 emissions.
 
@@ -26,6 +26,8 @@ def co2_main(path, vehicle_type="light_passenger", fuel="gasoline"):
     """
     total_emissions = 0.0
     emissions_per_vehicle = defaultdict(float)
+    speed_sums = defaultdict(float)
+    speed_counts = defaultdict(int)
     model = co2modeler
     to_float = float
 
@@ -39,7 +41,17 @@ def co2_main(path, vehicle_type="light_passenger", fuel="gasoline"):
             emission = model(speed, acceleration, vehicle_type, fuel)
             emissions_per_vehicle[vehicle_id] += emission
             total_emissions += emission
+            speed_sums[vehicle_id] += speed
+            speed_counts[vehicle_id] += 1
 
             elem.clear()  # Free memory
 
-    return total_emissions, dict(emissions_per_vehicle)
+    result = total_emissions, dict(emissions_per_vehicle)
+    if not include_speeds:
+        return result
+
+    average_speeds = {
+        vehicle_id: speed_sums[vehicle_id] / count
+        for vehicle_id, count in speed_counts.items()
+    }
+    return *result, average_speeds

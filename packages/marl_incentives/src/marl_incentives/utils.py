@@ -1,12 +1,88 @@
 """This module provides general useful functions"""
 
+import copy
+import json
 import os
 import pickle
+import random
+import subprocess
 import sys
+from datetime import datetime, timezone
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import yaml
+
+
+def set_global_seed(seed: int) -> None:
+    """Seed every random-number generator used by the experiments."""
+    random.seed(seed)
+    np.random.seed(seed)
+
+    from marl_incentives import traveller
+
+    traveller.set_random_seed(seed)
+
+    try:
+        import torch
+
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    except ImportError:
+        pass
+
+
+def prepare_run_config(config: dict, experiment: str, budget: int) -> dict:
+    """Return a copy whose generated SUMO artefacts live in a run directory."""
+    run_config = copy.deepcopy(config)
+    run_dir = Path("results") / "runs" / experiment / f"budget_{budget}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    generated_paths = {
+        "routes_file_path": "routes.rou.xml",
+        "edge_data_path": "edge_data.add.xml",
+        "log_path": "sumo.log",
+        "emissions_path": "fcd.xml",
+        "emissions_per_vehicle_path": "emissions_per_vehicle.txt",
+        "stats_path": "stats.xml",
+        "trip_info_path": "tripinfo.xml",
+        "edges_weights_path": "weights.xml",
+    }
+    for key, filename in generated_paths.items():
+        run_config["paths_dict"][key] = str(run_dir / filename)
+
+    run_config["sumo_config"]["config_path"] = str(run_dir / "config.sumocfg")
+    run_config["sumo_config"]["routes_path"] = run_config["paths_dict"][
+        "routes_file_path"
+    ]
+    run_config["sumo_config"]["seed"] = int(run_config.get("seed", 42))
+    run_config["run_dir"] = str(run_dir)
+    return run_config
+
+
+def save_run_metadata(config: dict, experiment: str, budget: int) -> None:
+    """Record the exact configuration and local SUMO version for a run."""
+    try:
+        version = subprocess.run(
+            ["sumo", "--version"], check=False, capture_output=True, text=True
+        ).stdout.splitlines()[0]
+    except (FileNotFoundError, IndexError):
+        version = "SUMO unavailable"
+
+    metadata = {
+        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "experiment": experiment,
+        "budget": budget,
+        "seed": int(config.get("seed", 42)),
+        "sumo_version": version,
+        "config": config,
+    }
+    path = Path(config["run_dir"]) / "run_metadata.json"
+    path.write_text(json.dumps(metadata, indent=2, sort_keys=True), encoding="utf-8")
 
 
 def load_config(path: str = "scripts/config_file.yaml") -> dict:
@@ -16,8 +92,16 @@ def load_config(path: str = "scripts/config_file.yaml") -> dict:
     :param path: Path to configuration file.
     :return: Configuration dictionary.
     """
-    with open(path, "r") as file:
-        return yaml.safe_load(file)
+    config_path = Path(path)
+    with config_path.open("r", encoding="utf-8") as file:
+        config = yaml.safe_load(file)
+
+    parent = config.pop("extends", None)
+    if parent:
+        inherited = load_config(str(config_path.parent / parent))
+        inherited.update(config)
+        return inherited
+    return config
 
 
 def save_plot_and_file(

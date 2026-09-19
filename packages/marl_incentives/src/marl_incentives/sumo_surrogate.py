@@ -2,13 +2,13 @@
 Surrogate model for large-scale multi-agent routing
 
 INPUT
-  Joint action vector for 1100 agents
+  Joint action vector for all configured agents
 
 OUTPUT
-  - 1100 individual travel times
+  - One individual travel time per agent
   - 1 total network travel time
 
-TOTAL OUTPUT DIM = 1101
+TOTAL OUTPUT DIM = number of agents + 1
 
 Added:
   - Dyna-friendly prediction helpers
@@ -30,17 +30,10 @@ from marl_incentives.environment import Network
 # CONFIG
 # ============================================================
 
-DATASET_PATH = Path("dataset.pt")
+DATASET_PATH = Path("results/surrogate/dataset.pt")
 LOAD_DATA = False
 
-NUM_AGENTS = 1100
-MAX_ACTIONS = 5
 NUM_SAMPLES = 10
-
-INDIVIDUAL_OUTPUTS = NUM_AGENTS
-GLOBAL_OUTPUTS = 1
-
-OUTPUT_DIM = INDIVIDUAL_OUTPUTS + GLOBAL_OUTPUTS
 
 EMBED_DIM = 16
 HIDDEN_DIM = 2048
@@ -51,36 +44,43 @@ EPOCHS = 10
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-# ============================================================
-# ACTION SPACE PER AGENT
-# ============================================================
-
-agent_num_actions = torch.randint(
-    low=2,
-    high=6,
-    size=(NUM_AGENTS,),
-)
-
-
 class SimulatorDataset(Dataset):
     """
     Generate data for training the SUMO surrogate model:
         simulator(joint_action)
 
     X shape:
-        [N, 1100]
+        [N, number of drivers]
 
     Y shape:
-        [N, 1101]
+        [N, number of drivers + 1]
     """
 
-    def __init__(self, drivers, network_env, num_samples):
+    def __init__(
+        self,
+        drivers,
+        network_env,
+        num_samples,
+        dataset_path=DATASET_PATH,
+        load_data=LOAD_DATA,
+    ):
+        self.dataset_path = Path(dataset_path)
+        self.driver_ids = [driver.trip_id for driver in drivers]
         # Load data if already stored
-        if LOAD_DATA and DATASET_PATH.exists():
-            data = torch.load(DATASET_PATH)
+        if load_data and self.dataset_path.exists():
+            data = torch.load(self.dataset_path, weights_only=True)
 
             self.X = data["X"]
             self.Y = data["Y"].float()
+            expected_shape = (len(drivers), len(drivers) + 1)
+            if self.X.shape[1] != expected_shape[0] or self.Y.shape[1] != expected_shape[1]:
+                raise ValueError(
+                    "Saved surrogate dataset dimensions do not match the current drivers"
+                )
+            if data.get("driver_ids") not in (None, self.driver_ids):
+                raise ValueError(
+                    "Saved surrogate dataset driver ordering does not match the current drivers"
+                )
 
         # Generate and store data
         else:
@@ -98,18 +98,20 @@ class SimulatorDataset(Dataset):
             self.save_dataset()
 
     def save_dataset(self):
+        self.dataset_path.parent.mkdir(parents=True, exist_ok=True)
         torch.save(
             {
                 "X": self.X,
                 "Y": self.Y,
+                "driver_ids": self.driver_ids,
             },
-            DATASET_PATH,
+            self.dataset_path,
         )
 
     @staticmethod
     def generate_actions(drivers, num_samples):
         actions = torch.zeros(
-            (num_samples, NUM_AGENTS),
+            (num_samples, len(drivers)),
             dtype=torch.long,
         )
 
@@ -136,8 +138,11 @@ class SimulatorDataset(Dataset):
 
             total_tt, ind_tt, _, _ = network_env.step(routes_edges=routes_edges)
 
+            missing = [driver.trip_id for driver in drivers if driver.trip_id not in ind_tt]
+            if missing:
+                raise ValueError(f"SUMO output is missing {len(missing)} driver(s)")
             y = torch.tensor(
-                list(ind_tt.values()) + [total_tt],
+                [ind_tt[driver.trip_id] for driver in drivers] + [total_tt],
                 dtype=torch.float32,
             )
 
@@ -153,16 +158,24 @@ class SimulatorDataset(Dataset):
 
 
 class SurrogateModel(nn.Module):
-    def __init__(self):
+    def __init__(
+        self,
+        num_agents: int,
+        max_actions: int,
+        embed_dim: int = EMBED_DIM,
+        hidden_dim: int = HIDDEN_DIM,
+    ):
         super().__init__()
+        self.num_agents = num_agents
+        self.max_actions = max_actions
 
         # ----------------------------------------------------
         # Action embeddings
         # ----------------------------------------------------
 
         self.action_embedding = nn.Embedding(
-            num_embeddings=MAX_ACTIONS,
-            embedding_dim=EMBED_DIM,
+            num_embeddings=max_actions,
+            embedding_dim=embed_dim,
         )
 
         # ----------------------------------------------------
@@ -170,24 +183,24 @@ class SurrogateModel(nn.Module):
         # ----------------------------------------------------
 
         self.agent_embedding = nn.Embedding(
-            num_embeddings=NUM_AGENTS,
-            embedding_dim=EMBED_DIM,
+            num_embeddings=num_agents,
+            embedding_dim=embed_dim,
         )
 
-        input_dim = NUM_AGENTS * EMBED_DIM
+        input_dim = num_agents * embed_dim
 
         self.mlp = nn.Sequential(
-            nn.Linear(input_dim, HIDDEN_DIM),
+            nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(HIDDEN_DIM, HIDDEN_DIM),
+            nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(HIDDEN_DIM, OUTPUT_DIM),
+            nn.Linear(hidden_dim, num_agents + 1),
         )
 
         # Precompute agent ids
         self.register_buffer(
             "agent_ids",
-            torch.arange(NUM_AGENTS),
+            torch.arange(num_agents),
         )
 
         # ----------------------------------------------------
@@ -203,9 +216,13 @@ class SurrogateModel(nn.Module):
     def forward(self, actions):
         """
         actions shape:
-            [batch_size, NUM_AGENTS]
+            [batch_size, number of drivers]
         """
 
+        if actions.ndim != 2 or actions.size(1) != self.num_agents:
+            raise ValueError(
+                f"Expected actions shaped [batch, {self.num_agents}], got {tuple(actions.shape)}"
+            )
         batch_size = actions.size(0)
 
         # ----------------------------------------------------
@@ -253,7 +270,7 @@ class SurrogateModel(nn.Module):
         pred = self.forward(joint_action)
 
         return {
-            "individual_tt": pred[:, :NUM_AGENTS],
+            "individual_tt": pred[:, : self.num_agents],
             "total_tt": pred[:, -1],
             "raw": pred,
         }
@@ -305,14 +322,14 @@ class SurrogateModel(nn.Module):
 
         Args:
             joint_action:
-                [NUM_AGENTS]
+                [number of drivers]
                 or
-                [1, NUM_AGENTS]
+                [1, number of drivers]
 
             target:
-                [OUTPUT_DIM]
+                [number of drivers + 1]
                 or
-                [1, OUTPUT_DIM]
+                [1, number of drivers + 1]
         """
 
         if joint_action.dim() == 2:
@@ -393,10 +410,10 @@ class SurrogateModel(nn.Module):
 
                 pred = self.forward(batch_X)
 
-                pred_individual = pred[:, :NUM_AGENTS]
+                pred_individual = pred[:, : self.num_agents]
                 pred_total = pred[:, -1]
 
-                true_individual = batch_Y[:, :NUM_AGENTS]
+                true_individual = batch_Y[:, : self.num_agents]
                 true_total = batch_Y[:, -1]
 
                 loss_individual = mse(
@@ -483,7 +500,9 @@ def main():
     # MODEL
     # ========================================================
 
-    model = SurrogateModel().to(DEVICE)
+    num_agents = len(drivers)
+    max_actions = max(len(driver.costs) for driver in drivers)
+    model = SurrogateModel(num_agents, max_actions).to(DEVICE)
 
     # Store offline dataset
     model.set_base_dataset(
@@ -513,10 +532,10 @@ def main():
 
             pred = model(X)
 
-            pred_individual = pred[:, :NUM_AGENTS]
+            pred_individual = pred[:, :num_agents]
             pred_total = pred[:, -1]
 
-            true_individual = Y[:, :NUM_AGENTS]
+            true_individual = Y[:, :num_agents]
             true_total = Y[:, -1]
 
             loss_individual = mse(
@@ -549,12 +568,12 @@ def main():
 
     with torch.no_grad():
         joint_action = torch.zeros(
-            (1, NUM_AGENTS),
+            (1, num_agents),
             dtype=torch.long,
         )
 
-        for agent_id in range(NUM_AGENTS):
-            n_actions = agent_num_actions[agent_id].item()
+        for agent_id, driver in enumerate(drivers):
+            n_actions = len(driver.costs)
 
             joint_action[0, agent_id] = torch.randint(
                 low=0,
@@ -582,14 +601,14 @@ def main():
 
     new_joint_action = torch.randint(
         low=0,
-        high=MAX_ACTIONS,
-        size=(NUM_AGENTS,),
+        high=max_actions,
+        size=(num_agents,),
     )
 
     # Example:
     # replace with REAL simulator output
 
-    new_target = torch.randn(OUTPUT_DIM)
+    new_target = torch.randn(num_agents + 1)
 
     model.add_experience(
         new_joint_action,

@@ -1,5 +1,8 @@
 # Number of training episodes for the RL agent
 episodes: 750
+seed: 42
+# weighted, speed_relative, or speed_percentile
+reward_mode: "weighted"
 
 # True if using compliance rate, false otherwise
 compliance_rate: False
