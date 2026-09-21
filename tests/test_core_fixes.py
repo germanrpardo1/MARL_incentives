@@ -5,11 +5,9 @@ from pathlib import Path
 
 import numpy as np
 import torch
-
 from marl_incentives import traveller, utils
 from marl_incentives.replay_buffer import StateReplayBuffer
 from marl_incentives.sumo_surrogate import SurrogateModel
-
 
 WEIGHTS = {
     "individual_tt": 1.0,

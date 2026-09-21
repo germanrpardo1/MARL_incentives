@@ -321,9 +321,7 @@ class Driver:
         if reward_mode in {"speed_relative", "speed_percentile"}:
             # Q-values are minimised throughout this codebase. Store the negative
             # paper reward so minimisation is equivalent to reward maximisation.
-            return -compute_speed_reward(
-                self.trip_id, individual_speeds, reward_mode
-            )
+            return -compute_speed_reward(self.trip_id, individual_speeds, reward_mode)
 
         if reward_mode != "weighted":
             raise ValueError(f"Unknown reward mode: {reward_mode}")
@@ -774,7 +772,7 @@ def policy_incentives_dqn_state(
 def initialise_drivers_dqn_state(
     actions_file_path: str,
     strategy: str,
-    budget: float = None,
+    budget: float | None = None,
 ) -> list[DQNStateDriver]:
     """
     Initialise all the drivers of type DQNStateDriver.

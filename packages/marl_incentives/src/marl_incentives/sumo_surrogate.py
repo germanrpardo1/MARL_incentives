@@ -44,6 +44,7 @@ EPOCHS = 10
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
+
 class SimulatorDataset(Dataset):
     """
     Generate data for training the SUMO surrogate model:
@@ -73,7 +74,10 @@ class SimulatorDataset(Dataset):
             self.X = data["X"]
             self.Y = data["Y"].float()
             expected_shape = (len(drivers), len(drivers) + 1)
-            if self.X.shape[1] != expected_shape[0] or self.Y.shape[1] != expected_shape[1]:
+            if (
+                self.X.shape[1] != expected_shape[0]
+                or self.Y.shape[1] != expected_shape[1]
+            ):
                 raise ValueError(
                     "Saved surrogate dataset dimensions do not match the current drivers"
                 )
@@ -138,7 +142,9 @@ class SimulatorDataset(Dataset):
 
             total_tt, ind_tt, _, _ = network_env.step(routes_edges=routes_edges)
 
-            missing = [driver.trip_id for driver in drivers if driver.trip_id not in ind_tt]
+            missing = [
+                driver.trip_id for driver in drivers if driver.trip_id not in ind_tt
+            ]
             if missing:
                 raise ValueError(f"SUMO output is missing {len(missing)} driver(s)")
             y = torch.tensor(

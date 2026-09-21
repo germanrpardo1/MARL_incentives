@@ -21,10 +21,7 @@ def co2_main(
     vehicle_type: str = "light_passenger",
     fuel: str = "gasoline",
     include_speeds: bool = False,
-) -> (
-    tuple[float, dict[str, float]]
-    | tuple[float, dict[str, float], dict[str, float]]
-):
+) -> tuple[float, dict[str, float]] | tuple[float, dict[str, float], dict[str, float]]:
     """
     Parse an XML file and calculate total and per-vehicle CO2 emissions.
 

@@ -7,7 +7,7 @@ import pickle
 import random
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -89,7 +89,7 @@ def save_run_metadata(config: dict, experiment: str, budget: int) -> None:
         version = "SUMO unavailable"
 
     metadata = {
-        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "created_utc": datetime.now(UTC).isoformat(),
         "experiment": experiment,
         "budget": budget,
         "seed": int(config.get("seed", 42)),
@@ -195,7 +195,7 @@ def load_pickle_array(path: str) -> np.ndarray | None:
     with open(path, "rb") as f:
         try:
             return np.array(pickle.load(f))
-        except Exception as e:
+        except (pickle.UnpicklingError, EOFError, OSError) as e:
             print(f"[ERROR] Failed to load pickle file {path}: {e}")
             return None
 

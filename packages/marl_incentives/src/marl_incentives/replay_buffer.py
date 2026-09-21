@@ -85,10 +85,9 @@ class ReplayBuffer:
                 reward_mode,
             )
             # Update Q-value
-            driver.q_values[idx] = (
-                (1 - learning_rate) * driver.q_values[idx]
-                + learning_rate * observed_reward
-            )
+            driver.q_values[idx] = (1 - learning_rate) * driver.q_values[
+                idx
+            ] + learning_rate * observed_reward
 
     def __len__(self) -> int:
         """Get the size of the replay buffer."""
@@ -164,9 +163,7 @@ class StateReplayBuffer:
             # Update state-action pairs counts
             driver.state_action_counts[index_state][idx] += 1
             # Calculate alpha based on state-action counts
-            learning_rate = (
-                alpha or 1 / driver.state_action_counts[index_state][idx]
-            )
+            learning_rate = alpha or 1 / driver.state_action_counts[index_state][idx]
 
             # Compute reward
             observed_reward = driver.compute_reward(
@@ -179,10 +176,9 @@ class StateReplayBuffer:
                 reward_mode,
             )
             # Update Q-value
-            driver.q_values[index_state][idx] = (
-                (1 - learning_rate) * driver.q_values[index_state][idx]
-                + learning_rate * observed_reward
-            )
+            driver.q_values[index_state][idx] = (1 - learning_rate) * driver.q_values[
+                index_state
+            ][idx] + learning_rate * observed_reward
 
     def __len__(self) -> int:
         """Get the size of the replay buffer."""

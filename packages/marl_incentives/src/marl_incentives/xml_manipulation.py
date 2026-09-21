@@ -167,8 +167,7 @@ def write_routes(routes_edges: dict, file: str = "data/output.rou.xml") -> None:
     vtype_element.set("sigma", "0.5")
 
     # Add vehicles and their routes to the XML
-    counter = 0
-    for vehicle_id, edges in routes_edges.items():
+    for counter, (vehicle_id, edges) in enumerate(routes_edges.items()):
         vehicle_element = ET.SubElement(routes_element, "vehicle")
         vehicle_element.set("id", vehicle_id)
         vehicle_element.set("type", "type1")
@@ -179,7 +178,6 @@ def write_routes(routes_edges: dict, file: str = "data/output.rou.xml") -> None:
         route_element = ET.SubElement(vehicle_element, "route")
         route_element.set("edges", " ".join(edges))
 
-        counter += 1
     # Convert the ElementTree to a string
     xml_str = ET.tostring(routes_element, "utf-8")
 
