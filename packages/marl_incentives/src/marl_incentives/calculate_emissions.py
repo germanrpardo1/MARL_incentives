@@ -8,6 +8,8 @@ The outputs are two txt file:
 2- Emissions_per_lane.txt contains the total emissions and the total emissions per lane
 """
 
+from __future__ import annotations
+
 from collections import defaultdict
 from pathlib import Path
 

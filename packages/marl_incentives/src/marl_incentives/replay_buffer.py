@@ -1,5 +1,7 @@
 """Module for the experience replay."""
 
+from __future__ import annotations
+
 import random
 from collections import deque
 from collections.abc import Mapping, Sequence
@@ -44,7 +46,7 @@ class ReplayBuffer:
 
     @staticmethod
     def update_q_values(
-        drivers: list["Driver"],
+        drivers: list[Driver],
         action_index: Mapping[str, int],
         reward: Sequence[object],
         weights: dict[str, float],
@@ -128,7 +130,7 @@ class StateReplayBuffer:
 
     @staticmethod
     def update_q_values_discrete_state(
-        drivers: list["Driver"],
+        drivers: list[Driver],
         state_index: Mapping[str, int] | Sequence[int],
         action_index: Mapping[str, int],
         reward: Sequence[object],

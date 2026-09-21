@@ -1,5 +1,7 @@
 """Module that represents the SUMO network"""
 
+from __future__ import annotations
+
 import subprocess
 import sys
 
@@ -49,13 +51,11 @@ class Network:
         with open(self.paths_dict["log_path"], "w+", encoding="utf-8") as log_file:
             sys.stdout = sumolib.TeeFile(sys.__stdout__, log_file)
 
-            log_file.flush()
-            sys.__stdout__.flush()
-
-            # sumo_cmd = ["sumo-gui", "-c", self.sumo_params["config_path"]]
-            sumo_cmd = ["sumo", "-c", self.sumo_params["config_path"]]
-            sumo_cmd = list(map(str, sumo_cmd))
-            subprocess.call(sumo_cmd, stdout=log_file, stderr=log_file)
+            try:
+                sumo_cmd = ["sumo", "-c", self.sumo_params["config_path"]]
+                subprocess.call(sumo_cmd, stdout=log_file, stderr=log_file)
+            finally:
+                sys.stdout = sys.__stdout__
 
     def step(
         self,

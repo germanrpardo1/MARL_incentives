@@ -1,5 +1,7 @@
 """This module provides general useful functions"""
 
+from __future__ import annotations
+
 import copy
 import json
 import os
@@ -389,11 +391,11 @@ def log_progress(
     :param interval: How often to print detailed info.
     :param window: Number of entries to average for first/last comparison.
     """
-    # Progress bar
     percent = (i + 1) / episodes * 100
-    prog_bar = "=" * int(percent // 2)  # 50-char bar
-    sys.stdout.write(f"\rProgress: [{prog_bar:<50}] {percent:.1f}%")
-    sys.stdout.flush()
+    prog_bar = "=" * int(percent // 2)
+
+    sys.__stdout__.write(f"\rProgress: [{prog_bar:<50}] {percent:.1f}%")
+    sys.__stdout__.flush()
 
     # Print extra info every `interval` episodes or on final episode
     if (i + 1) % interval == 0 or (i + 1) == episodes:
@@ -405,11 +407,11 @@ def log_progress(
             np.mean(ttts_array[-window:]) if len(ttts_array) >= 1 else float("nan")
         )
 
-        sys.stdout.write(
+        sys.__stdout__.write(
             f"TTT first {window}: {first_mean:.2f} | "
             f"TTT last {window}: {last_mean:.2f}\n"
         )
-        sys.stdout.flush()
+        sys.__stdout__.flush()
 
 
 def make_file_paths(
