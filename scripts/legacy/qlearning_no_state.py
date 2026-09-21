@@ -5,6 +5,8 @@ It does not use experience replay, and it does not have a state
 variable. It is the original algorithm.
 """
 
+from pathlib import Path
+
 from marl_incentives import environment as env
 from marl_incentives import traveller as tr
 from marl_incentives import utils as ut
@@ -133,7 +135,7 @@ def main(config, total_budget: int) -> None:
 
 if __name__ == "__main__":
     # Load config
-    config_file = ut.load_config(path="scripts/qlearning_no_state.yaml")
+    config_file = ut.load_config(path=Path(__file__).resolve().with_suffix(".yaml"))
 
     # Loop for different budgets
     for tot_budget in config_file["total_budget"]:

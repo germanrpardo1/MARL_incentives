@@ -12,34 +12,42 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 import yaml
+
+from marl_incentives import traveller
+
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
 
 
 def set_global_seed(seed: int) -> None:
-    """Seed every random-number generator used by the experiments."""
+    """
+    Seed every random-number generator used by the experiments.
+
+    :param seed: Seed shared by Python, NumPy, traveller policies, and PyTorch.
+    :return: None.
+    """
     random.seed(seed)
     np.random.seed(seed)
-
-    from marl_incentives import traveller
-
     traveller.set_random_seed(seed)
-
-    try:
-        import torch
-
-        torch.manual_seed(seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-    except ImportError:
-        pass
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 def prepare_run_config(config: dict, experiment: str, budget: int) -> dict:
-    """Return a copy whose generated SUMO artefacts live in a run directory."""
+    """
+    Configure a dedicated directory for generated artefacts from one run.
+
+    :param config: Experiment configuration to copy and update.
+    :param experiment: Stable experiment name used in the output directory.
+    :param budget: Incentive budget used in the run.
+    :return: A copied configuration containing run-specific output paths.
+    """
     run_config = copy.deepcopy(config)
-    run_dir = Path("results") / "runs" / experiment / f"budget_{budget}"
+    run_dir = PROJECT_ROOT / "results" / "runs" / experiment / f"budget_{budget}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
     generated_paths = {
@@ -65,7 +73,14 @@ def prepare_run_config(config: dict, experiment: str, budget: int) -> dict:
 
 
 def save_run_metadata(config: dict, experiment: str, budget: int) -> None:
-    """Record the exact configuration and local SUMO version for a run."""
+    """
+    Record the exact configuration and local SUMO version for a run.
+
+    :param config: Prepared experiment configuration containing ``run_dir``.
+    :param experiment: Name of the experiment being recorded.
+    :param budget: Incentive budget used in the run.
+    :return: None.
+    """
     try:
         version = subprocess.run(
             ["sumo", "--version"], check=False, capture_output=True, text=True
@@ -475,10 +490,21 @@ def unpack_config(config: dict) -> tuple[dict, dict, dict, int, dict]:
 
     # Dictionary with all paths
     paths_dict = config["paths_dict"]
+
+    # Resolve relative paths against the project root.
+    for key, value in paths_dict.items():
+        path = Path(value)
+        if not path.is_absolute():
+            paths_dict[key] = PROJECT_ROOT / path
     # Define edge data granularity
     edge_data_frequency = config["edge_data_frequency"]
     # Parameters to run SUMO
     sumo_params = config["sumo_config"]
+    for key, value in sumo_params.items():
+        if key.endswith("_path"):
+            path = Path(value)
+            if not path.is_absolute():
+                sumo_params[key] = PROJECT_ROOT / path
 
     return weights, hyperparams, paths_dict, edge_data_frequency, sumo_params
 

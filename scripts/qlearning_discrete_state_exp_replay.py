@@ -5,6 +5,8 @@ It uses experience replay to accelerate learning, and it has a
 discrete state variable.
 """
 
+from pathlib import Path
+
 from marl_incentives import environment as env
 from marl_incentives import traveller as tr
 from marl_incentives import utils as ut
@@ -123,9 +125,7 @@ def main(config, total_budget: int) -> None:
 
 if __name__ == "__main__":
     # Load config
-    config_file = ut.load_config(
-        path="scripts/qlearning_discrete_state_exp_replay.yaml"
-    )
+    config_file = ut.load_config(path=Path(__file__).resolve().with_suffix(".yaml"))
 
     # Loop for different budgets
     for tot_budget in config_file["total_budget"]:

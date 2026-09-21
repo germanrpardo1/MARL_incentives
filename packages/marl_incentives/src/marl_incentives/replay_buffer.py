@@ -2,8 +2,13 @@
 
 import random
 from collections import deque
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from marl_incentives.traveller import Driver
 
 
 class ReplayBuffer:
@@ -39,15 +44,26 @@ class ReplayBuffer:
 
     @staticmethod
     def update_q_values(
-        drivers: list,
-        action_index,
-        reward,
-        weights: dict,
+        drivers: list["Driver"],
+        action_index: Mapping[str, int],
+        reward: Sequence[object],
+        weights: dict[str, float],
         alpha: float | None,
-        individual_speeds: dict | None = None,
+        individual_speeds: dict[str, float] | None = None,
         reward_mode: str = "weighted",
-    ):
-        """complete."""
+    ) -> None:
+        """
+        Update each driver's action value from one replayed observation.
+
+        :param drivers: Drivers whose Q-values will be updated.
+        :param action_index: Selected action index keyed by driver ID.
+        :param reward: Simulation outputs used to compute each driver's reward.
+        :param weights: Weights for the multi-objective reward.
+        :param alpha: Fixed learning rate, or ``None`` for count-based updates.
+        :param individual_speeds: Optional mean speed keyed by driver ID.
+        :param reward_mode: Reward definition to apply.
+        :return: None.
+        """
         total_tt, ind_tt, ind_em, total_em, *extra = reward
         if individual_speeds is None and extra:
             individual_speeds = extra[0]
@@ -113,16 +129,28 @@ class StateReplayBuffer:
 
     @staticmethod
     def update_q_values_discrete_state(
-        drivers: list,
-        state_index,
-        action_index,
-        reward,
-        weights: dict,
+        drivers: list["Driver"],
+        state_index: Mapping[str, int] | Sequence[int],
+        action_index: Mapping[str, int],
+        reward: Sequence[object],
+        weights: dict[str, float],
         alpha: float | None,
-        individual_speeds: dict | None = None,
+        individual_speeds: dict[str, float] | None = None,
         reward_mode: str = "weighted",
-    ):
-        """complete."""
+    ) -> None:
+        """
+        Update each driver's state-action value from a replayed observation.
+
+        :param drivers: Drivers whose Q-values will be updated.
+        :param state_index: Stored state per driver, as a mapping or aligned sequence.
+        :param action_index: Selected action index keyed by driver ID.
+        :param reward: Simulation outputs used to compute each driver's reward.
+        :param weights: Weights for the multi-objective reward.
+        :param alpha: Fixed learning rate, or ``None`` for count-based updates.
+        :param individual_speeds: Optional mean speed keyed by driver ID.
+        :param reward_mode: Reward definition to apply.
+        :return: None.
+        """
         total_tt, ind_tt, ind_em, total_em, *extra = reward
         if individual_speeds is None and extra:
             individual_speeds = extra[0]

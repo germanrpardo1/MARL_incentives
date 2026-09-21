@@ -6,6 +6,7 @@ a state variable.
 """
 
 import sys
+from pathlib import Path
 
 from marl_incentives import traveller as tr
 from marl_incentives import utils as ut
@@ -176,9 +177,9 @@ def main(config, total_budget: int) -> None:
 if __name__ == "__main__":
     # Load config
     config_path = (
-        sys.argv[1]
+        Path(sys.argv[1])
         if len(sys.argv) > 1
-        else "scripts/qlearning_no_state_exp_replay.yaml"
+        else Path(__file__).resolve().parent / "qlearning_no_state_exp_replay.yaml"
     )
     config_file = ut.load_config(path=config_path)
 

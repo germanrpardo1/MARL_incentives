@@ -8,8 +8,9 @@ are used to update the agents.
 
 ## What is included
 
-- `data/` contains the Kamppi SUMO network, route alternatives, and simulation
-  input/output files.
+- A local `data/` folder must contain the Kamppi SUMO network and route
+  alternatives. These files are required to run the experiments but are too
+  large to be stored in this GitHub repository.
 - `packages/marl_incentives/` contains the shared simulation, traveller,
   replay-buffer, emissions, and neural-network code.
 - `scripts/` contains experiment entry points and their YAML configurations.

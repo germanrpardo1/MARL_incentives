@@ -14,7 +14,12 @@ _rng = np.random.default_rng()
 
 
 def set_random_seed(seed: int) -> None:
-    """Reset the module-level generator used by all traveller policies."""
+    """
+    Reset the module-level generator used by all traveller policies.
+
+    :param seed: Seed for the NumPy random-number generator.
+    :return: None.
+    """
     global _rng
     _rng = np.random.default_rng(seed)
 
@@ -22,7 +27,14 @@ def set_random_seed(seed: int) -> None:
 def compute_speed_reward(
     trip_id: str, individual_speeds: dict[str, float], reward_mode: str
 ) -> float:
-    """Compute either of the speed rewards defined in the paper."""
+    """
+    Compute either of the speed rewards defined in the paper.
+
+    :param trip_id: Driver identifier whose reward is required.
+    :param individual_speeds: Mean speed keyed by driver ID.
+    :param reward_mode: ``speed_relative`` or ``speed_percentile``.
+    :return: The paper's speed-based reward for the selected driver.
+    """
     if not individual_speeds:
         raise ValueError(f"{reward_mode} reward requires individual speeds")
 

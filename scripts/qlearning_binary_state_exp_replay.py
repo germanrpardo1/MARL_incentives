@@ -5,6 +5,8 @@ It uses experience replay to accelerate learning, and it has a
 discrete state variable.
 """
 
+from pathlib import Path
+
 from marl_incentives import environment as env
 from marl_incentives import traveller as tr
 from marl_incentives import utils as ut
@@ -20,7 +22,16 @@ def experience_replay(
     alpha: float | None,
     reward_mode: str,
 ) -> None:
-    """pass."""
+    """
+    Sample stored transitions and update every driver's state-action values.
+
+    :param network_env: Network containing the state replay buffer.
+    :param drivers: Drivers whose Q-tables will be updated.
+    :param weights: Weights for the multi-objective reward.
+    :param alpha: Fixed learning rate, or ``None`` for count-based updates.
+    :param reward_mode: Reward definition to apply.
+    :return: None.
+    """
     # Sample past observations from replay buffer
     states, acts, rewards = network_env.buffer.sample(network_env.buffer.batch_size)
     for s, a, r in zip(states, acts, rewards):
@@ -177,7 +188,7 @@ def main(config, total_budget: int) -> None:
 
 if __name__ == "__main__":
     # Load config
-    config_file = ut.load_config(path="scripts/qlearning_binary_state_exp_replay.yaml")
+    config_file = ut.load_config(path=Path(__file__).resolve().with_suffix(".yaml"))
 
     # Loop for different budgets
     for tot_budget in config_file["total_budget"]:

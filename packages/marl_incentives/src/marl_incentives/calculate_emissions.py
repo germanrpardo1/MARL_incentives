@@ -9,20 +9,31 @@ The outputs are two txt file:
 """
 
 from collections import defaultdict
+from pathlib import Path
 
 from lxml import etree
 
 from marl_incentives.co2modeler_v1 import co2modeler  # Import the CO2 modeler
 
 
-def co2_main(path, vehicle_type="light_passenger", fuel="gasoline", include_speeds=False):
+def co2_main(
+    path: str | Path,
+    vehicle_type: str = "light_passenger",
+    fuel: str = "gasoline",
+    include_speeds: bool = False,
+) -> (
+    tuple[float, dict[str, float]]
+    | tuple[float, dict[str, float], dict[str, float]]
+):
     """
     Parse an XML file and calculate total and per-vehicle CO2 emissions.
 
     :param path: Path to the XML file containing vehicle data.
     :param vehicle_type: Type of vehicle to model ('light_passenger' by default).
     :param fuel: Type of fuel used ('gasoline' by default).
-    :return: Tuple of (total emissions, dictionary of emissions per vehicle).
+    :param include_speeds: Whether to include mean speed for each vehicle.
+    :return: Total and per-vehicle emissions, plus per-vehicle mean speeds when
+        ``include_speeds`` is true.
     """
     total_emissions = 0.0
     emissions_per_vehicle = defaultdict(float)
