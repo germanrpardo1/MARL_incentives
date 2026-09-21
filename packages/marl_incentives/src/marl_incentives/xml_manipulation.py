@@ -33,6 +33,12 @@ def write_sumo_config(
     config_path: str,
     network_path: str,
     routes_path: str,
+    edge_data_path: str,
+    trip_info_path: str,
+    log_path: str,
+    stats_path: str,
+    emissions_path: str,
+    seed: int = 42,
 ) -> None:
     """
     Write SUMO configuration file.
@@ -41,14 +47,15 @@ def write_sumo_config(
     :param network_path: Path to the network file.
     :param routes_path: Path to the routes file.
     """
-    # This is the directory your script is in
-    script_dir = Path(__file__).resolve().parent.parent
-    # Navigate up to the project root and into 'data'
-    ### Fix
-    data_path = script_dir.parent.parent.parent / "data" / "edge_data.add.xml"
-    config_path = script_dir.parent.parent.parent / config_path
-    network_path = script_dir.parent.parent.parent / network_path
-    routes_path = script_dir.parent.parent.parent / routes_path
+    config_path = Path(config_path).resolve()
+    network_path = Path(network_path).resolve()
+    routes_path = Path(routes_path).resolve()
+    edge_data_path = Path(edge_data_path).resolve()
+    trip_info_path = Path(trip_info_path).resolve()
+    log_path = Path(log_path).resolve()
+    stats_path = Path(stats_path).resolve()
+    emissions_path = Path(emissions_path).resolve()
+    config_path.parent.mkdir(parents=True, exist_ok=True)
 
     sumo_cmd = [
         "sumo",
@@ -59,14 +66,16 @@ def write_sumo_config(
         "--save-configuration",
         config_path,
         "--edgedata-output",
-        data_path,
+        edge_data_path,
         "--tripinfo-output",
-        str(Path("data") / "tripinfo.xml"),
+        trip_info_path,
         "--log",
-        str(Path("data") / "log.xml"),
+        log_path,
         "--no-step-log",
         "--additional-files",
-        data_path,
+        edge_data_path,
+        "--seed",
+        str(seed),
         "--begin",
         "0",
         "--route-steps",
@@ -84,9 +93,9 @@ def write_sumo_config(
         "--no-warnings",
         "True",
         "--statistic-output",
-        str(Path("data") / "stats.xml"),
+        stats_path,
         "--fcd-output",
-        str(Path("data") / "fcd.xml"),
+        emissions_path,
         "--fcd-output.acceleration",
     ]
 
@@ -101,6 +110,10 @@ def write_edge_data_config(filename: str, weights_path: str, freq: int) -> None:
     :param weights_path: Path to the weights file.
     :param freq: Edge data granularity.
     """
+    filename = Path(filename)
+    filename.parent.mkdir(parents=True, exist_ok=True)
+    weights_path = str(Path(weights_path).resolve())
+
     # Create the root element
     root = ET.Element("a")
 
@@ -134,6 +147,9 @@ def write_routes(routes_edges: dict, file: str = "data/output.rou.xml") -> None:
     :param routes_edges: Dictionary containing all the edges for every trip
     :param file: Path to the output file
     """
+    file = Path(file)
+    file.parent.mkdir(parents=True, exist_ok=True)
+
     # Create the root element
     routes_element = ET.Element("routes")
     routes_element.set("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance")
@@ -151,8 +167,7 @@ def write_routes(routes_edges: dict, file: str = "data/output.rou.xml") -> None:
     vtype_element.set("sigma", "0.5")
 
     # Add vehicles and their routes to the XML
-    counter = 0
-    for vehicle_id, edges in routes_edges.items():
+    for counter, (vehicle_id, edges) in enumerate(routes_edges.items()):
         vehicle_element = ET.SubElement(routes_element, "vehicle")
         vehicle_element.set("id", vehicle_id)
         vehicle_element.set("type", "type1")
@@ -163,7 +178,6 @@ def write_routes(routes_edges: dict, file: str = "data/output.rou.xml") -> None:
         route_element = ET.SubElement(vehicle_element, "route")
         route_element.set("edges", " ".join(edges))
 
-        counter += 1
     # Convert the ElementTree to a string
     xml_str = ET.tostring(routes_element, "utf-8")
 

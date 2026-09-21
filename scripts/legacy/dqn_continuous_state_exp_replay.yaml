@@ -1,11 +1,5 @@
 # Number of training episodes for the RL agent
-episodes: 750
-seed: 42
-# weighted, speed_relative, or speed_percentile
-reward_mode: "weighted"
-
-# True if using compliance rate, false otherwise
-compliance_rate: False
+episodes: 500
 
 ### Weights for different components of the reward/cost function
 # Weight for Total Travel Time (TTT) of the network
@@ -17,10 +11,17 @@ emissions_weight: 0
 # Total emissions weight
 total_emissions_weight: 0
 
+# Exploration rate for epsilon-greedy policy
+epsilon: 0.9
+# Epsilon decay rate per episode (to reduce exploration over time)
+decay: 0.992
+# Learning rate (α) for Q-learning or other value update algorithms
+alpha: 0.1
 # Whether to use incentives or not
-incentives_mode: True
+incentives_mode: true
 # Total available budget for incentives or policies (can be used as a constraint)
 total_budget:
+  - 50000
   - 100000000
 # Select route selection strategy
 strategy: "logit"

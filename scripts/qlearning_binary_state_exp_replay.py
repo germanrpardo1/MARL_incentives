@@ -5,6 +5,8 @@ It uses experience replay to accelerate learning, and it has a
 discrete state variable.
 """
 
+from pathlib import Path
+
 from marl_incentives import environment as env
 from marl_incentives import traveller as tr
 from marl_incentives import utils as ut
@@ -14,9 +16,22 @@ from marl_incentives.traveller import Driver
 
 
 def experience_replay(
-    network_env: Network, drivers: list[Driver], weights, alpha: float | None
+    network_env: Network,
+    drivers: list[Driver],
+    weights,
+    alpha: float | None,
+    reward_mode: str,
 ) -> None:
-    """pass."""
+    """
+    Sample stored transitions and update every driver's state-action values.
+
+    :param network_env: Network containing the state replay buffer.
+    :param drivers: Drivers whose Q-tables will be updated.
+    :param weights: Weights for the multi-objective reward.
+    :param alpha: Fixed learning rate, or ``None`` for count-based updates.
+    :param reward_mode: Reward definition to apply.
+    :return: None.
+    """
     # Sample past observations from replay buffer
     states, acts, rewards = network_env.buffer.sample(network_env.buffer.batch_size)
     for s, a, r in zip(states, acts, rewards):
@@ -29,6 +44,7 @@ def experience_replay(
             reward=r,
             weights=weights,
             alpha=alpha,
+            reward_mode=reward_mode,
         )
 
 
@@ -39,6 +55,11 @@ def main(config, total_budget: int) -> None:
     :param config: Configuration dictionary.
     :param total_budget: Total budget.
     """
+    experiment = "qlearning_binary_state_exp_replay"
+    config = ut.prepare_run_config(config, experiment, total_budget)
+    ut.set_global_seed(config.get("seed", 42))
+    ut.save_run_metadata(config, experiment, total_budget)
+
     # Unpack configuration file
     weights, hyperparams, paths_dict, edge_data_frequency, sumo_params = (
         ut.unpack_config(config)
@@ -89,8 +110,14 @@ def main(config, total_budget: int) -> None:
             routes_edges=routes_edges,
         )
 
-        reward_tuple = [(60**2) * total_tt / 1100, ind_tt, ind_em, total_em]
-        states_tuple = {driver.trip_id: driver.state for driver in drivers}
+        reward_tuple = [
+            (60**2) * total_tt / len(drivers),
+            ind_tt,
+            ind_em,
+            total_em,
+            network_env.individual_speeds,
+        ]
+        states_tuple = [driver.state for driver in drivers]
         network_env.buffer.push(states_tuple, actions_index, reward_tuple)
 
         # Record TTT and total emissions throughout iterations
@@ -99,7 +126,13 @@ def main(config, total_budget: int) -> None:
 
         # If there are enough observations in the buffer, sample and update Qs
         if len(network_env.buffer) >= network_env.buffer.batch_size:
-            experience_replay(network_env, drivers, weights, hyperparams["alpha"])
+            experience_replay(
+                network_env,
+                drivers,
+                weights,
+                hyperparams["alpha"],
+                config.get("reward_mode", "weighted"),
+            )
 
         # Reduce epsilon
         epsilon = max(0.01, epsilon * decay)
@@ -109,7 +142,8 @@ def main(config, total_budget: int) -> None:
 
         # Update travel times
         ut.update_average_travel_times(
-            drivers=drivers, weights=xml.parse_weights("data/weights.xml")
+            drivers=drivers,
+            weights=xml.parse_weights(paths_dict["edges_weights_path"]),
         )
 
     # Save the plot and pickle file for TTT and emissions
@@ -154,7 +188,7 @@ def main(config, total_budget: int) -> None:
 
 if __name__ == "__main__":
     # Load config
-    config_file = ut.load_config(path="scripts/qlearning_binary_state_exp_replay.yaml")
+    config_file = ut.load_config(path=Path(__file__).resolve().with_suffix(".yaml"))
 
     # Loop for different budgets
     for tot_budget in config_file["total_budget"]:

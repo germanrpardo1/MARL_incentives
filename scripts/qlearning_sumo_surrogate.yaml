@@ -1,5 +1,9 @@
 # Number of training episodes for the RL agent
 episodes: 750
+seed: 42
+surrogate_dataset_path: "dataset.pt"
+surrogate_checkpoint_path: "model.pth"
+load_surrogate_dataset: true
 
 # True if using compliance rate, false otherwise
 compliance_rate: False

@@ -1,5 +1,7 @@
 """This script generates the plots."""
 
+from pathlib import Path
+
 import marl_incentives.utils as ut
 
 
@@ -86,6 +88,6 @@ def plot_multiple_budgets(config_file: dict) -> None:
 
 if __name__ == "__main__":
     # Load config_file
-    config = ut.load_config(path="scripts/generate_plots.yaml")
+    config = ut.load_config(path=Path(__file__).resolve().with_suffix(".yaml"))
 
     plot_multiple_budgets(config)
